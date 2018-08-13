@@ -186,4 +186,5 @@ bool VerifyScript(
     const BaseSignatureChecker& checker,
     uint32_t consensusBranchId,
     ScriptError* serror = NULL);
+
 #endif // BITCOIN_SCRIPT_INTERPRETER_H
