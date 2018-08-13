@@ -3171,7 +3171,7 @@ bool static DisconnectTip(CValidationState &state, bool fBare = false) {
     for (int i = 0; i < block.vtx.size(); i++)
     {
         CTransaction &tx = block.vtx[i];
-        if ((i == (block.vtx.size() - 1) && block.IsVerusPOSBlock()))
+        if ((i == (block.vtx.size() - 1)) && (block.IsVerusPOSBlock() || (komodo_isPoS((CBlock *)&block) != 0)))
         {
             EraseFromWallets(tx.GetHash());
         }
