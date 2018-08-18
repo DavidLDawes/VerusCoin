@@ -15,7 +15,7 @@ variables:
   WINDOWS_INSTALLER: VerusCoin-v$VERSION-beta-windows-installer.exe
 
 
-build:linux:
+.build:linux:
   image: asherd/veruscoin-cross-compiler:linux
   variables:
     DOCKER_DRIVER: overlay2
@@ -250,7 +250,9 @@ package:
   - git clone https://github.com/VerusCoin/Media-Assets  --single-branch -b master Agama
   - mkdir -p assets/imgs/
   - cp Media-Assets/Logos/PNG/*  assets/imgs/
-  - gsutil cp $STAGING/ucrtbased.dll Agama
+  - gsutil cp $STAGING/ucrtbased.zip .
+  - unzip ucrtbased.zip
+  - mv ucrtbased.dll Agama
   script:
   - builder build zcutil/VerusCoin.xml windows --setvars project.version=$VERSION-beta
   - mv builds/$WINDOWS_INSTALLER .
