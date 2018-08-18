@@ -43,7 +43,7 @@
                     <folderList>
                         <folder>
                             <description>Verus-Enhanced Agama Wallet</description>
-                            <destination>${installdir}/Agama</destination>
+                            <destination>${installdir}/</destination>
                             <name>Agama</name>
                             <platforms>all</platforms>
                             <distributionFileList>
