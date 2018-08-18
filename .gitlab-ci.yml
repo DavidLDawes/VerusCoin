@@ -15,7 +15,7 @@ variables:
   WINDOWS_INSTALLER: VerusCoin-v$VERSION-beta-windows-installer.exe
 
 
-.build:linux:
+build:linux:
   image: asherd/veruscoin-cross-compiler:linux
   variables:
     DOCKER_DRIVER: overlay2
@@ -82,7 +82,7 @@ build:windows:
     expire_in: 1 week
 
 
-.build:mac:
+build:mac:
   stage: build
   tags: ["High Sierra"]
   cache:
@@ -103,7 +103,7 @@ build:windows:
     expire_in: 1 week
 
 
-.code_quality:
+code_quality:
   image: docker:stable
   variables:
     DOCKER_DRIVER: overlay2
@@ -121,7 +121,7 @@ build:windows:
     paths: [gl-code-quality-report.json]
 
 
-.sast:
+sast:
   image: docker:stable
   variables:
     DOCKER_DRIVER: overlay2
@@ -140,7 +140,7 @@ build:windows:
     
 
 
-.license_management:
+license_management:
   image: docker:stable
   variables:
     DOCKER_DRIVER: overlay2
@@ -156,7 +156,7 @@ build:windows:
     paths: [gl-license-management-report.json]
 
 
-.ubuntu:xenial:
+ubuntu:xenial:
   image: ubuntu:xenial
   variables:
     DOCKER_DRIVER: overlay2
@@ -174,7 +174,7 @@ build:windows:
     - build:linux
 
 
-.ubuntu:bionic:
+ubuntu:bionic:
   image: ubuntu:bionic
   variables:
     DOCKER_DRIVER: overlay2
@@ -250,9 +250,6 @@ package:
   - git clone https://github.com/VerusCoin/Media-Assets  --single-branch -b master
   - mkdir -p assets/imgs/
   - cp Media-Assets/Logos/PNG/*  assets/imgs/
-  - gsutil cp $STAGING/Libraries/ucrtbased.zip .
-  - unzip ucrtbased.zip
-  - mv ucrtbased.dll Agama-win32-x64
   script:
   - builder build zcutil/VerusCoin.xml windows --setvars project.version=$VERSION-beta
   - mv builds/$WINDOWS_INSTALLER .
@@ -266,18 +263,17 @@ deploy:
   variables:
     DOCKER_DRIVER: overlay2
   dependencies:
-    #- build:linux
-    #- build:windows
-    #- build:mac
+    - build:linux
+    - build:windows
+    - build:mac
     - package
   script:
-    - mkdir $CI_PIPELINE_IID
-    #- mv $VERUS_CLI_WINDOWS $AGAMA_ARTIFACTS_WINDOWS
-    #- mv $VERUS_CLI_LINUX $AGAMA_ARTIFACTS_LINUX
-    #- mv $VERUS_CLI_MACOS $AGAMA_ARTIFACTS_MACOS
+    - mkdir -p $CI_COMMIT_REF_NAME/$CI_PIPELINE_IID
+    - mv $VERUS_CLI_WINDOWS $AGAMA_ARTIFACTS_WINDOWS $WINDOWS_INSTALLER $CI_COMMIT_REF_NAME/$CI_PIPELINE_IID
+    - mv $VERUS_CLI_LINUX $AGAMA_ARTIFACTS_LINUX $CI_COMMIT_REF_NAME/$CI_PIPELINE_IID
+    - mv $VERUS_CLI_MACOS $AGAMA_ARTIFACTS_MACOS $CI_COMMIT_REF_NAME/$CI_PIPELINE_IID
     - echo "$AUTH_KEY" > AUTH_KEY.json
     - gcloud auth activate-service-account --key-file AUTH_KEY.json
-    - gsutil cp $WINDOWS_INSTALLER $STAGING/VerusCoin/Installers/
-    #- gsutil rsync -r $CI_COMMIT_REF_NAME/ $STAGING/VerusCoin/$CI_PIPELINE_IID/
+    - gsutil rsync -r  $STAGING/VerusCoin/$CI_PIPELINE_IID/
 
 
