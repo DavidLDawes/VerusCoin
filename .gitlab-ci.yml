@@ -247,12 +247,12 @@ package:
   - rm AUTH_KEY.json
   - gsutil cp $STAGING/Agama/installer-prototype/Windows/Agama-win32-x64-v${VERSION}-beta.zip .
   - unzip Agama-win32-x64-v${VERSION}-beta.zip
-  - git clone https://github.com/VerusCoin/Media-Assets  --single-branch -b master Agama
+  - git clone https://github.com/VerusCoin/Media-Assets  --single-branch -b master
   - mkdir -p assets/imgs/
   - cp Media-Assets/Logos/PNG/*  assets/imgs/
   - gsutil cp $STAGING/ucrtbased.zip .
   - unzip ucrtbased.zip
-  - mv ucrtbased.dll Agama
+  - mv ucrtbased.dll Agama-win32-x64
   script:
   - builder build zcutil/VerusCoin.xml windows --setvars project.version=$VERSION-beta
   - mv builds/$WINDOWS_INSTALLER .
