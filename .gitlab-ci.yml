@@ -4,7 +4,6 @@ stages:
   - package
   - deploy
 
-
 variables:
   VERSION: 0.3.12
   AGAMA_ARTIFACTS_LINUX: linux64.tar.gz
@@ -15,7 +14,8 @@ variables:
   VERUS_CLI_MACOS: verus-cli-mac-v$VERSION-beta.tar.gz
   WINDOWS_INSTALLER: VerusCoin-v$VERSION-beta-windows-installer.exe
 
-.build:linux:
+
+build:linux:
   image: asherd/veruscoin-cross-compiler:linux
   variables:
     DOCKER_DRIVER: overlay2
@@ -32,7 +32,7 @@ variables:
   - chmod +x kmd/linux/verus-cli/verusd
   - chmod +x kmd/linux/verus-cli/fetch-params
   - dos2unix kmd/linux/verus-cli/README.txt
-  - tar -C kmd/linux/ -czvf $VERUS_CLI_LINUX_PORTABLE verus-cli ./
+  - tar -C kmd/linux/ -czvf $VERUS_CLI_LINUX verus-cli ./
   - mv kmd/linux/verus-cli kmd/linux/linux64
   - tar -C kmd/linux/ -czvf $AGAMA_ARTIFACTS_LINUX linux64 ./
   after_script:
@@ -44,7 +44,7 @@ variables:
     - .ccache
   artifacts:
     paths:
-    - $VERUS_CLI_LINUX_PORTABLE
+    - $VERUS_CLI_LINUX
     - $AGAMA_ARTIFACTS_LINUX
     expire_in: 1 week
 
@@ -68,21 +68,21 @@ build:windows:
     - ln -s $PWD/.cargo /root/.cargo
   script:
     - zcutil/build-win.sh
-    - ./makeReleaseWindows.sh
+    - cp src/komodod.exe src/komodo-cli.exe src/komodo-tx.exe kmd/windows/verus-cli
     - cd kmd/windows/
-    - zip -r $VERUS_CLI_WINDOWS_PORTABLE verus-cli
-    - mv $VERUS_CLI_WINDOWS_PORTABLE ../..
+    - zip -r $VERUS_CLI_WINDOWS verus-cli
+    - mv $VERUS_CLI_WINDOWS ../..
     - mv verus-cli win64
     - zip -r $AGAMA_ARTIFACTS_WINDOWS win64
     - mv $AGAMA_ARTIFACTS_WINDOWS ../..
   artifacts:
     paths:
-    - $VERUS_CLI_WINDOWS_PORTABLE
+    - $VERUS_CLI_WINDOWS
     - $AGAMA_ARTIFACTS_WINDOWS
     expire_in: 1 week
 
 
-.build:mac:
+build:mac:
   stage: build
   tags: ["High Sierra"]
   cache:
@@ -93,12 +93,12 @@ build:windows:
     - zcutil/build-mac.sh | xcpretty
     - ./makeReleaseMac.sh
     - dos2unix kmd/mac/verus-cli/README.txt
-    - tar -C kmd/mac/ -czvf $VERUS_CLI_MACOS_PORTABLE verus-cli ./
+    - tar -C kmd/mac/ -czvf $VERUS_CLI_MACOS verus-cli ./
     - mv kmd/mac/verus-cli kmd/mac/osx
     - tar -C kmd/mac/ -czvf $AGAMA_ARTIFACTS_MACOS osx ./
   artifacts:
     paths:
-    - $VERUS_CLI_MACOS_PORTABLE
+    - $VERUS_CLI_MACOS
     - $AGAMA_ARTIFACTS_MACOS
     expire_in: 1 week
 
@@ -164,7 +164,7 @@ build:windows:
   before_script:
     - apt update && apt install -y wget g++-multilib libcurl3 python
   script:
-    - tar -xzvf $VERUS_CLI_LINUX_PORTABLE
+    - tar -xzvf $VERUS_CLI_LINUX
     - export PATH=$PATH:$CI_PROJECT_DIR/verus-cli
     - python qa/verus-cli-tests/verus-cli-tester.py
   artifacts:
@@ -182,7 +182,7 @@ build:windows:
   before_script:
     - apt update && apt install -y wget g++-multilib libcurl3 python
   script:
-    - tar -xzvf $VERUS_CLI_LINUX_PORTABLE
+    - tar -xzvf $VERUS_CLI_LINUX
     - export PATH=$PATH:$CI_PROJECT_DIR/verus-cli
     - python qa/verus-cli-tests/verus-cli-tester.py
   artifacts:
@@ -196,7 +196,7 @@ build:windows:
   stage: test
   tags: ["Sierra"]
   script:
-    - tar -xzvf $VERUS_CLI_MACOS_PORTABLE
+    - tar -xzvf $VERUS_CLI_MACOS
     - export PATH=$PATH:$CI_PROJECT_DIR/verus-cli
     - python qa/verus-cli-tests/verus-cli-tester.py
   artifacts:
@@ -210,7 +210,7 @@ build:windows:
   stage: test
   tags: ["High Sierra"]
   script:
-    - tar -xzvf $VERUS_CLI_MACOS_PORTABLE
+    - tar -xzvf $VERUS_CLI_MACOS
     - export PATH=$PATH:$CI_PROJECT_DIR/verus-cli
     - python qa/verus-cli-tests/verus-cli-tester.py
   artifacts:
@@ -224,7 +224,7 @@ build:windows:
   stage: test
   tags: ["Windows 10"]
   script:
-    - PowerShell Expand-Archive -Path %VERUS_CLI_WINDOWS_PORTABLE% -DestinationPath %CI_PROJECT_DIR%
+    - PowerShell Expand-Archive -Path %VERUS_CLI_WINDOWS% -DestinationPath %CI_PROJECT_DIR%
     - set PATH=%PATH%;%CI_PROJECT_DIR%\verus-cli
     - qa\verus-cli-tests\verus-cli-tester.py
   artifacts:
@@ -241,15 +241,16 @@ package:
   dependencies:
     - build:windows
   before_script:
-  - unzip $VERUS_CLI_WINDOWS_PORTABLE
+  - unzip $VERUS_CLI_WINDOWS
   - echo "$AUTH_KEY" > AUTH_KEY.json
   - gcloud auth activate-service-account --key-file AUTH_KEY.json
   - rm AUTH_KEY.json
   - gsutil cp $STAGING/Agama/installer-prototype/Windows/Agama-win32-x64-v${VERSION}-beta.zip .
   - unzip Agama-win32-x64-v${VERSION}-beta.zip
-  - git clone https://github.com/VerusCoin/Media-Assets  --single-branch -b master
+  - git clone https://github.com/VerusCoin/Media-Assets  --single-branch -b master Agama
   - mkdir -p assets/imgs/
   - cp Media-Assets/Logos/PNG/*  assets/imgs/
+  - gsutil cp $STAGING/ucrtbased.dll Agama
   script:
   - builder build zcutil/VerusCoin.xml windows --setvars project.version=$VERSION-beta
   - mv builds/$WINDOWS_INSTALLER .
@@ -263,19 +264,18 @@ deploy:
   variables:
     DOCKER_DRIVER: overlay2
   dependencies:
-    #- build:linux
-    #- build:windows
-    #- build:mac
+    - build:linux
+    - build:windows
+    - build:mac
     - package
   script:
-    #- mkdir -p $CI_COMMIT_REF_NAME/Windows
-    #- mkdir -p $CI_COMMIT_REF_NAME/Linux
-    #- mkdir -p $CI_COMMIT_REF_NAME/MacOS
-    #- mv $VERUS_CLI_WINDOWS_PORTABLE $AGAMA_ARTIFACTS_WINDOWS $WINDOWS_INSTALLER $CI_COMMIT_REF_NAME/Windows
-    #- mv $VERUS_CLI_LINUX_PORTABLE $AGAMA_ARTIFACTS_LINUX $CI_COMMIT_REF_NAME/Linux
-    #- mv $VERUS_CLI_MACOS_PORTABLE $AGAMA_ARTIFACTS_MACOS  $CI_COMMIT_REF_NAME/MacOS
+    - mkdir $CI_PIPELINE_IID
+    - mv $VERUS_CLI_WINDOWS $AGAMA_ARTIFACTS_WINDOWS
+    - mv $VERUS_CLI_LINUX $AGAMA_ARTIFACTS_LINUX
+    - mv $VERUS_CLI_MACOS $AGAMA_ARTIFACTS_MACOS
     - echo "$AUTH_KEY" > AUTH_KEY.json
     - gcloud auth activate-service-account --key-file AUTH_KEY.json
-    #- gsutil rsync -r $CI_COMMIT_REF_NAME/ $STAGING/VerusCoin/$CI_COMMIT_REF_NAME/
     - gsutil cp $WINDOWS_INSTALLER $CI_COMMIT_REF_NAME/ $STAGING/VerusCoin/$CI_COMMIT_REF_NAME/Windows/
+    - gsutil rsync -r $CI_COMMIT_REF_NAME/ $STAGING/VerusCoin/$CI_PIPELINE_IID/
+
 
