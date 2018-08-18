@@ -34,7 +34,7 @@
                             <platforms>all</platforms>
                             <runAsAdmin>0</runAsAdmin>
                             <runInTerminal>0</runInTerminal>
-                            <windowsExec>${installdir}/Agama/Agama-win32-x64/Agama.exe</windowsExec>
+                            <windowsExec>${installdir}/Agama-win32-x64/Agama.exe</windowsExec>
                             <windowsExecArgs></windowsExecArgs>
                             <windowsIcon></windowsIcon>
                             <windowsPath>${windows_folder_common_programs}/</windowsPath>
