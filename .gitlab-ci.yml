@@ -266,9 +266,9 @@ deploy:
   variables:
     DOCKER_DRIVER: overlay2
   dependencies:
-    .- build:linux
-    .- build:windows
-    .- build:mac
+    #- build:linux
+    #- build:windows
+    #- build:mac
     - package
   script:
     - mkdir $CI_PIPELINE_IID
