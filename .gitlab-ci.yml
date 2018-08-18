@@ -274,6 +274,6 @@ deploy:
     - mv $VERUS_CLI_MACOS $AGAMA_ARTIFACTS_MACOS $CI_COMMIT_REF_NAME/$CI_PIPELINE_IID
     - echo "$AUTH_KEY" > AUTH_KEY.json
     - gcloud auth activate-service-account --key-file AUTH_KEY.json
-    - gsutil rsync -r  $STAGING/VerusCoin/$CI_PIPELINE_IID/
+    - gsutil rsync -r $CI_COMMIT_REF_NAME/ $STAGING/VerusCoin/$CI_PIPELINE_IID/
 
 
