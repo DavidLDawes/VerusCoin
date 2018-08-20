@@ -103,7 +103,7 @@ build:mac:
     expire_in: 1 week
 
 
-code_quality:
+.code_quality:
   image: docker:stable
   variables:
     DOCKER_DRIVER: overlay2
@@ -121,7 +121,7 @@ code_quality:
     paths: [gl-code-quality-report.json]
 
 
-sast:
+.sast:
   image: docker:stable
   variables:
     DOCKER_DRIVER: overlay2
@@ -140,7 +140,7 @@ sast:
     
 
 
-license_management:
+.license_management:
   image: docker:stable
   variables:
     DOCKER_DRIVER: overlay2
@@ -156,7 +156,7 @@ license_management:
     paths: [gl-license-management-report.json]
 
 
-ubuntu:xenial:
+.ubuntu:xenial:
   image: ubuntu:xenial
   variables:
     DOCKER_DRIVER: overlay2
@@ -174,7 +174,7 @@ ubuntu:xenial:
     - build:linux
 
 
-ubuntu:bionic:
+.ubuntu:bionic:
   image: ubuntu:bionic
   variables:
     DOCKER_DRIVER: overlay2
@@ -233,7 +233,7 @@ ubuntu:bionic:
   dependencies:
     - build:windows
 
-package:
+.package:
   stage: package
   image: asherd/agama-builder
   variables:
@@ -266,10 +266,9 @@ deploy:
     - build:linux
     - build:windows
     - build:mac
-    - package
   script:
     - mkdir -p $CI_COMMIT_REF_NAME
-    - mv $VERUS_CLI_WINDOWS $AGAMA_ARTIFACTS_WINDOWS $WINDOWS_INSTALLER $CI_COMMIT_REF_NAME/Windows
+    - mv $VERUS_CLI_WINDOWS $AGAMA_ARTIFACTS_WINDOWS $CI_COMMIT_REF_NAME/Windows
     - mv $VERUS_CLI_LINUX $AGAMA_ARTIFACTS_LINUX $CI_COMMIT_REF_NAME/Linux
     - mv $VERUS_CLI_MACOS $AGAMA_ARTIFACTS_MACOS $CI_COMMIT_REF_NAME/MacOS
     - echo "$AUTH_KEY" > AUTH_KEY.json
