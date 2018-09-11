@@ -4,7 +4,7 @@ stages:
 - deploy
 
 variables:
-  VERSION: 0.3.13
+  VERSION: 0.3.14
   VERUS_CLI_LINUX: "Verus-CLI-Linux-v${VERSION}-beta.tar.gz"
   VERUS_CLI_WINDOWS: "Verus-CLI-Windows-v${VERSION}-beta.zip"
   VERUS_CLI_MACOS: "Verus-CLI-MacOS-v${VERSION}-beta.tar.gz"
@@ -20,7 +20,8 @@ build:linux:
   - mv .ccache /root/ || true
   script:
   - zcutil/build.sh -j4
-  - cp src/komodod src/komodo-cli kmd/linux/verus-cli
+  - cp zcutil/fetch-params.sh src/verus src/verusd src/komodod src/komodo-cli
+  - mv kmd/linux/verus-cli/fetch-params.sh kmd/linux/verus-cli/fetch-params
   - chmod +x kmd/linux/verus-cli/komodod
   - chmod +x kmd/linux/verus-cli/komodo-cli
   - chmod +x kmd/linux/verus-cli/verus
@@ -62,7 +63,7 @@ build:windows:
   - ln -s $PWD/.cargo /root/.cargo
   script:
   - zcutil/build-win.sh -j4
-  - cp src/komodod.exe src/komodo-cli.exe src/komodo-tx.exe kmd/windows/verus-cli
+  - cp zcutil/fetch-params.bat src/verusd.bat src/verus.bat src/komodod.exe src/komodo-cli.exe src/komodo-tx.exe kmd/windows/verus-cli
   - cd kmd/windows/
   - zip -r $VERUS_CLI_WINDOWS verus-cli
   - mv $VERUS_CLI_WINDOWS ../..
@@ -80,6 +81,7 @@ build:mac:
     - depends/built
   script:
   - brew bundle
+  - cp zcutil/fetch-params.sh src/verus src/verusd kmd/mac/verus-cli
   - zcutil/build-mac.sh -j6 | xcpretty
   - ./makeReleaseMac.sh
   - dos2unix kmd/mac/verus-cli/README.txt
