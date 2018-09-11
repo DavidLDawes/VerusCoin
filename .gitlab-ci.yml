@@ -9,7 +9,7 @@ variables:
   VERUS_CLI_WINDOWS: "Verus-CLI-Windows-v${VERSION}-beta.zip"
   VERUS_CLI_MACOS: "Verus-CLI-MacOS-v${VERSION}-beta.tar.gz"
   DOWNSTREAM_AGAMA_BRANCH: "${CI_COMMIT_REF_NAME}"
-  COMMIT_MESSAGE: "$(git log -1 --pretty=%B)"
+  COMMIT_MESSAGE: $(git log -1 --pretty=%B)
   POST_COMMENT: "Branch: ${CI_COMMIT_REF_NAME}$\nCommit: ${CI_COMMIT_SHA} $\n${COMMIT_MESSAGE}"
   CLI_POST_CHANNEL: file-upload-test
 
