@@ -248,8 +248,8 @@ deploy:
   - build:windows
   - build:mac
   before_script:
-  - export COMMIT_MESSAGE=$(git log -1 --pretty=%B)
-  - 'export POST_COMMENT="Branch: ${CI_COMMIT_REF_NAME}\nCommit: ${CI_COMMIT_SHA}\n${COMMIT_MESSAGE}"'
+  - export COMMIT_MESSAGE="$(git log -1 --pretty=%B)"
+  - 'export POST_COMMENT="Branch: ${CI_COMMIT_REF_NAME}${\n}Commit: ${CI_COMMIT_SHA}${\n}${COMMIT_MESSAGE}"'
   - export VERUS_CLI_LINUX_MD5=$(md5sum $VERUS_CLI_LINUX | cut -d " " -f 1)
   - export VERUS_CLI_WINDOWS_MD5=$(md5sum $VERUS_CLI_WINDOWS | cut -d " " -f 1)
   - export VERUS_CLI_MACOS_MD5=$(md5sum $VERUS_CLI_MACOS | cut -d " " -f 1)
