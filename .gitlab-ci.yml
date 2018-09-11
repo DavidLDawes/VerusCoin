@@ -249,7 +249,8 @@ deploy:
   - build:mac
   before_script:
   - export COMMIT_MESSAGE=$(git log -1 --pretty=%B)
-  - 'export POST_COMMENT="Branch: ${CI_COMMIT_REF_NAME}$\nCommit: ${CI_COMMIT_SHA} $\n${COMMIT_MESSAGE}"'
+  - 'export NEW_LINE=$"\n"'
+  - 'export POST_COMMENT="Branch: ${CI_COMMIT_REF_NAME}${NEW_LINE}Commit: ${CI_COMMIT_SHA} ${NEW_LINE}${COMMIT_MESSAGE}"'
   - export VERUS_CLI_LINUX_MD5=$(md5sum $VERUS_CLI_LINUX | cut -d " " -f 1)
   - export VERUS_CLI_WINDOWS_MD5=$(md5sum $VERUS_CLI_WINDOWS | cut -d " " -f 1)
   - export VERUS_CLI_MACOS_MD5=$(md5sum $VERUS_CLI_MACOS | cut -d " " -f 1)
@@ -260,7 +261,7 @@ deploy:
       -F initial_comment="${POST_COMMENT}$VERUS_CLI_LINUX_MD5"
       -H "${SLACK_BOT_AUTH}"
       "https://slack.com/api/files.upload"
-  - curl -F file=@"$VERUS_CLI_WINDOWS"
+# - curl -F file=@"$VERUS_CLI_WINDOWS"
 #      -F channels="$CLI_POST_CHANNEL"
 #      -F initial_comment="${POST_COMMENT}$VERUS_CLI_WINDOWS_MD5"
 #      -H "${SLACK_BOT_AUTH}"
