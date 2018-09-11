@@ -8,7 +8,10 @@ variables:
   VERUS_CLI_LINUX: "Verus-CLI-Linux-v${VERSION}-beta.tar.gz"
   VERUS_CLI_WINDOWS: "Verus-CLI-Windows-v${VERSION}-beta.zip"
   VERUS_CLI_MACOS: "Verus-CLI-MacOS-v${VERSION}-beta.tar.gz"
-  POST_COMMENT: "Branch and Commit: ${CI_COMMIT_REF_NAME} ${CI_COMMIT_SHA} $'\n'MD5: "
+  DOWNSTREAM_AGAMA_BRANCH: "${CI_COMMIT_REF_NAME}"
+  COMMIT_MESSAGE: "$(git log -1 --pretty=%B)"
+  POST_COMMENT: "Branch: ${CI_COMMIT_REF_NAME}$\nCommit: ${CI_COMMIT_SHA} $\n${COMMIT_MESSAGE}"
+  CLI_POST_CHANNEL: file-upload-test
 
 build:linux:
   image: asherd/veruscoin-cross-compiler:linux
@@ -257,15 +260,15 @@ deploy:
       -H "${SLACK_BOT_AUTH}"
       "https://slack.com/api/files.upload"
   - curl -F file=@"$VERUS_CLI_WINDOWS"
-      -F channels="$CLI_POST_CHANNEL"
-      -F initial_comment="${POST_COMMENT}$VERUS_CLI_WINDOWS_MD5"
-      -H "${SLACK_BOT_AUTH}"
-      "https://slack.com/api/files.upload"
-  - curl -F file=@"$VERUS_CLI_MACOS"
-      -F channels="$CLI_POST_CHANNEL"
-      -F initial_comment="${POST_COMMENT}$VERUS_CLI_MACOS_MD5"
-      -H "${SLACK_BOT_AUTH}"
-      "https://slack.com/api/files.upload"
+#      -F channels="$CLI_POST_CHANNEL"
+#      -F initial_comment="${POST_COMMENT}$VERUS_CLI_WINDOWS_MD5"
+#      -H "${SLACK_BOT_AUTH}"
+#      "https://slack.com/api/files.upload"
+#  - curl -F file=@"$VERUS_CLI_MACOS"
+#      -F channels="$CLI_POST_CHANNEL"
+#      -F initial_comment="${POST_COMMENT}$VERUS_CLI_MACOS_MD5"
+#      -H "${SLACK_BOT_AUTH}"
+#      "https://slack.com/api/files.upload"
   - mkdir Windows && mkdir Linux && mkdir MacOS &&
     mv $VERUS_CLI_WINDOWS Windows &&
     mv $VERUS_CLI_LINUX Linux &&
@@ -276,8 +279,8 @@ deploy:
   - gsutil cp -r Windows Linux MacOS $STAGING/VerusCoin/$CI_COMMIT_REF_NAME/
   - curl -X POST
       -F token="$CI_JOB_TOKEN"
-      -F ref=dev
-      -F variables\[UPSTREAM_CLI_BRANCH\]="$CI_COMMIT_REF_NAME"
+      -F ref="$DOWNSTREAM_AGAMA_BRANCH"
+      -F variables\[UPSTREAM_CLI_BUILD_INFO\]="${POST_COMMENT}"
       -F variables\[VERUS_CLI_LINUX\]="$VERUS_CLI_LINUX"
       -F variables\[VERUS_CLI_WINDOWS\]="$VERUS_CLI_WINDOWS"
       -F variables\[VERUS_CLI_MACOS\]="$VERUS_CLI_MACOS"
