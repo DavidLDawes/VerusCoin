@@ -9,7 +9,6 @@ variables:
   VERUS_CLI_WINDOWS: "Verus-CLI-Windows-v${VERSION}-beta.zip"
   VERUS_CLI_MACOS: "Verus-CLI-MacOS-v${VERSION}-beta.tar.gz"
   DOWNSTREAM_AGAMA_BRANCH: "${CI_COMMIT_REF_NAME}"
-  CLI_POST_CHANNEL: file-upload-test
 
 build:linux:
   image: asherd/veruscoin-cross-compiler:linux
@@ -249,8 +248,7 @@ deploy:
   - build:mac
   before_script:
   - export COMMIT_MESSAGE="$(git log -1 --pretty)"
-  - echo "$(git log -1 --pretty)"
-  - 'export POST_COMMENT="Branch: ${CI_COMMIT_REF_NAME}
+  - 'export POST_COMMENT="Branch: ${CI_COMMIT_REF_NAME} $/n
   ${COMMIT_MESSAGE}"'
   - export VERUS_CLI_LINUX_MD5=$(md5sum $VERUS_CLI_LINUX | cut -d " " -f 1)
   - export VERUS_CLI_WINDOWS_MD5=$(md5sum $VERUS_CLI_WINDOWS | cut -d " " -f 1)
