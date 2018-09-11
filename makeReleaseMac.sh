@@ -66,7 +66,7 @@ do
 done
 
 chmod +x kmd/mac/verus-cli/fetch-params
-chmod +x kmd/linux/verus-cli/verus
-chmod +x kmd/linux/verus-cli/verusd
+chmod +x kmd/mac/verus-cli/verus
+chmod +x kmd/mac/verus-cli/verusd
 
 

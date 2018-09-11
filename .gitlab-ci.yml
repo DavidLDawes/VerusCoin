@@ -85,6 +85,7 @@ build:mac:
   script:
   - brew bundle
   - cp zcutil/fetch-params.sh src/verus src/verusd kmd/mac/verus-cli
+  - mv kmd/mac/verus-cli/fetch-params.sh kmd/mac/verus-cli/fetch-params
   - zcutil/build-mac.sh -j6 | xcpretty
   - ./makeReleaseMac.sh
   - dos2unix kmd/mac/verus-cli/README.txt
