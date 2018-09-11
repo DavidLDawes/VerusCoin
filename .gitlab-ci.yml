@@ -20,7 +20,7 @@ build:linux:
   - mv .ccache /root/ || true
   script:
   - zcutil/build.sh -j4
-  - cp zcutil/fetch-params.sh src/verus src/verusd src/komodod src/komodo-cli
+  - cp zcutil/fetch-params.sh src/verus src/verusd src/komodod src/komodo-cli kmd/linux/verus-cli/
   - mv kmd/linux/verus-cli/fetch-params.sh kmd/linux/verus-cli/fetch-params
   - chmod +x kmd/linux/verus-cli/komodod
   - chmod +x kmd/linux/verus-cli/komodo-cli
