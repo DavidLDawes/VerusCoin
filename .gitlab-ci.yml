@@ -13,7 +13,6 @@ variables:
   Branch: ${CI_COMMIT_REF_NAME}$\n
   Commit: ${CI_COMMIT_SHA}$\n
   Author:  ${GITLAB_USER_NAME} <${GITLAB_USER_EMAIL}>$\n
-  ${CI_COMMIT_TITLE}$\n
   ${CI_COMMIT_MESSAGE}"
 
 build:linux:
