@@ -165,7 +165,7 @@ build:mac:
   artifacts:
     paths: [log.txt]
     expire_in: 1 week
-  dependencies: [build:linux]
+  dependencies: ["build:linux"]
 
 
 .ubuntu:bionic:
@@ -189,7 +189,7 @@ build:mac:
   artifacts:
     paths: [log.txt]
     expire_in: 1 week
-  dependencies: [build:linux]
+  dependencies: ["build:linux"]
 
 
 .osx:sierra: # fetch-params.sh needs to be fixed for MacOS
@@ -202,7 +202,7 @@ build:mac:
   artifacts:
     paths: [log.txt]
     expire_in: 1 week
-  dependencies: [build:mac]
+  dependencies: ["build:mac"]
 
 
 .osx:high-sierra: # fetch-params.sh needs to be fixed for MacOS
@@ -215,7 +215,7 @@ build:mac:
   artifacts:
     paths: [log.txt]
     expire_in: 1 week
-  dependencies: [build:mac]
+  dependencies: ["build:mac"]
 
 
 .windows:10:
@@ -228,7 +228,7 @@ build:mac:
   artifacts:
     paths: [log.txt]
     expire_in: 1 week
-  dependencies: [build:windows]
+  dependencies: ["build:windows"]
 
 
 deploy:
