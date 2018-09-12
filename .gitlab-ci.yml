@@ -9,11 +9,11 @@ variables:
   VERUS_CLI_WINDOWS: "Verus-CLI-Windows-v${VERSION}-beta.zip"
   VERUS_CLI_MACOS: "Verus-CLI-MacOS-v${VERSION}-beta.tar.gz"
   DOWNSTREAM_AGAMA_BRANCH: "${CI_COMMIT_REF_NAME}"
-  POST_MESSAGE: "Pipeline Source: ${CI_PIPELINE_SOURCE}
-  Branch: ${CI_COMMIT_REF_NAME}
-  Commit: ${CI_COMMIT_SHA}
-  Author:  ${GITLAB_USER_NAME} <${GITLAB_USER_EMAIL}>
-  ${CI_COMMIT_TITLE}
+  POST_MESSAGE: "Pipeline Source: ${CI_PIPELINE_SOURCE}$\n
+  Branch: ${CI_COMMIT_REF_NAME}$\n
+  Commit: ${CI_COMMIT_SHA}$\n
+  Author:  ${GITLAB_USER_NAME} <${GITLAB_USER_EMAIL}>$\n
+  ${CI_COMMIT_TITLE}$\n
   ${CI_COMMIT_MESSAGE}"
 
 build:linux:
