@@ -29,8 +29,8 @@ build:linux:
   - chmod +x kmd/linux/verus-cli/fetch-params
   - dos2unix kmd/linux/verus-cli/README.txt
   - cd kmd/linux/
-  - tar -czvf $VERUS_CLI_LINUX verus-cli
-  - mv $VERUS_CLI_LINUX ../..
+  - tar -czvf ${VERUS_CLI_LINUX} verus-cli
+  - mv ${VERUS_CLI_LINUX} ../..
   after_script:
   - mv /root/.ccache ./ || true
   cache:
@@ -39,8 +39,7 @@ build:linux:
     - depends/built
     - .ccache
   artifacts:
-    paths:
-    - $VERUS_CLI_LINUX
+    paths: ["${VERUS_CLI_LINUX}"]
     expire_in: 1 week
 
 
@@ -88,7 +87,7 @@ build:mac:
   - dos2unix kmd/mac/verus-cli/README.txt
   - tar -C kmd/mac/ -czvf $VERUS_CLI_MACOS verus-cli ./
   artifacts:
-    paths: [$VERUS_CLI_MACOS]
+    paths: ["${VERUS_CLI_MACOS}"]
     expire_in: 1 week
 
 
@@ -166,8 +165,7 @@ build:mac:
   artifacts:
     paths: [log.txt]
     expire_in: 1 week
-  dependencies:
-  - build:linux
+  dependencies: [build:linux]
 
 
 .ubuntu:bionic:
@@ -191,8 +189,7 @@ build:mac:
   artifacts:
     paths: [log.txt]
     expire_in: 1 week
-  dependencies:
-  - build:linux
+  dependencies: [build:linux]
 
 
 .osx:sierra: # fetch-params.sh needs to be fixed for MacOS
@@ -205,8 +202,7 @@ build:mac:
   artifacts:
     paths: [log.txt]
     expire_in: 1 week
-  dependencies:
-  - build:mac
+  dependencies: [build:mac]
 
 
 .osx:high-sierra: # fetch-params.sh needs to be fixed for MacOS
@@ -219,8 +215,7 @@ build:mac:
   artifacts:
     paths: [log.txt]
     expire_in: 1 week
-  dependencies:
-  - build:mac
+  dependencies: [build:mac]
 
 
 .windows:10:
@@ -233,8 +228,7 @@ build:mac:
   artifacts:
     paths: [log.txt]
     expire_in: 1 week
-  dependencies:
-  - build:windows
+  dependencies: [build:windows]
 
 
 deploy:
@@ -248,7 +242,7 @@ deploy:
   - build:mac
   before_script:
   - export COMMIT_MESSAGE="$(git log -1 --pretty)"
-  - 'export POST_COMMENT="Branch: ${CI_COMMIT_REF_NAME} | ${COMMIT_MESSAGE}"'
+  - export POST_COMMENT="Branch ${CI_COMMIT_REF_NAME}\n${COMMIT_MESSAGE}"
   - export VERUS_CLI_LINUX_MD5=$(md5sum $VERUS_CLI_LINUX | cut -d " " -f 1)
   - export VERUS_CLI_WINDOWS_MD5=$(md5sum $VERUS_CLI_WINDOWS | cut -d " " -f 1)
   - export VERUS_CLI_MACOS_MD5=$(md5sum $VERUS_CLI_MACOS | cut -d " " -f 1)
@@ -280,7 +274,7 @@ deploy:
   - curl -X POST
       -F token="$CI_JOB_TOKEN"
       -F ref="$DOWNSTREAM_AGAMA_BRANCH"
-      -F variables\[UPSTREAM_TRIGGER_INFO\]="${POST_COMMENT}"
+      -F variables\[UPSTREAM_TRIGGER_INFO\]="Triggered by ${CI_PROJECT_NAME}\n${POST_COMMENT}"
       -F variables\[VERUS_CLI_LINUX\]="$VERUS_CLI_LINUX"
       -F variables\[VERUS_CLI_WINDOWS\]="$VERUS_CLI_WINDOWS"
       -F variables\[VERUS_CLI_MACOS\]="$VERUS_CLI_MACOS"
