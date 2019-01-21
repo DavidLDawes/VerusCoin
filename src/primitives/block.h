@@ -6,11 +6,12 @@
 #ifndef BITCOIN_PRIMITIVES_BLOCK_H
 #define BITCOIN_PRIMITIVES_BLOCK_H
 
-#include "primitives/transaction.h"
 #include "primitives/nonce.h"
+#include "primitives/transaction.h"
 #include "serialize.h"
 #include "uint256.h"
 #include "arith_uint256.h"
+#include "primitives/solutiondata.h"
 
 /** Nodes collect new transactions into a block, hash them into a hash tree,
  * and scan through nonce values to make the block's hash satisfy proof-of-work
@@ -23,15 +24,17 @@ class CBlockHeader
 {
 public:
     // header
-    static const size_t HEADER_SIZE=4+32+32+32+4+4+32; // excluding Equihash solution
-    static const int32_t CURRENT_VERSION=4;
+    static const size_t HEADER_SIZE=4+32+32+32+4+4+32;  // excluding Equihash solution
+    static const int32_t CURRENT_VERSION=CPOSNonce::VERUS_V1;
+    static const int32_t CURRENT_VERSION_MASK=0x0000ffff; // for compatibility
+    static const int32_t VERUS_V2=CPOSNonce::VERUS_V2;
+
     static uint256 (CBlockHeader::*hashFunction)() const;
-    static void SetHashAlgo();
 
     int32_t nVersion;
     uint256 hashPrevBlock;
     uint256 hashMerkleRoot;
-    uint256 hashReserved;
+    uint256 hashFinalSaplingRoot;
     uint32_t nTime;
     uint32_t nBits;
     CPOSNonce nNonce;
@@ -45,12 +48,11 @@ public:
     ADD_SERIALIZE_METHODS;
 
     template <typename Stream, typename Operation>
-    inline void SerializationOp(Stream& s, Operation ser_action, int nType, int nVersion) {
+    inline void SerializationOp(Stream& s, Operation ser_action) {
         READWRITE(this->nVersion);
-        nVersion = this->nVersion;
         READWRITE(hashPrevBlock);
         READWRITE(hashMerkleRoot);
-        READWRITE(hashReserved);
+        READWRITE(hashFinalSaplingRoot);
         READWRITE(nTime);
         READWRITE(nBits);
         READWRITE(nNonce);
@@ -62,7 +64,7 @@ public:
         nVersion = CBlockHeader::CURRENT_VERSION;
         hashPrevBlock.SetNull();
         hashMerkleRoot.SetNull();
-        hashReserved.SetNull();
+        hashFinalSaplingRoot.SetNull();
         nTime = 0;
         nBits = 0;
         nNonce = uint256();
@@ -85,10 +87,12 @@ public:
     uint256 GetVerusHash() const;
     static void SetVerusHash();
 
-    bool GetRawVerusPOSHash(uint256 &value, int32_t nHeight) const;
-    uint256 GetVerusEntropyHash(int32_t nHeight) const;
-
     uint256 GetVerusV2Hash() const;
+    static void SetVerusV2Hash();
+
+    bool GetRawVerusPOSHash(uint256 &ret, int32_t nHeight) const;
+    bool GetVerusPOSHash(arith_uint256 &ret, int32_t nHeight, CAmount value) const; // value is amount of stake tx
+    uint256 GetVerusEntropyHash(int32_t nHeight) const;
 
     int64_t GetBlockTime() const
     {
@@ -109,25 +113,66 @@ public:
 
     bool IsVerusPOSBlock() const
     {
-        return nNonce.IsPOSNonce();
+        return nNonce.IsPOSNonce(nVersion);
     }
 
     void SetVerusPOSTarget(uint32_t nBits)
     {
-        CVerusHashWriter hashWriter = CVerusHashWriter(SER_GETHASH, PROTOCOL_VERSION);
+        if (nVersion == VERUS_V2)
+        {
+            CVerusHashV2Writer hashWriter = CVerusHashV2Writer(SER_GETHASH, PROTOCOL_VERSION);
 
-        arith_uint256 arNonce = UintToArith256(nNonce);
+            arith_uint256 arNonce = UintToArith256(nNonce);
 
-        // printf("before svpt: %s\n", ArithToUint256(arNonce).GetHex().c_str());
+            // printf("before svpt: %s\n", ArithToUint256(arNonce).GetHex().c_str());
 
-        arNonce = (arNonce & CPOSNonce::entropyMask) | nBits;
+            arNonce = (arNonce & CPOSNonce::entropyMask) | nBits;
 
-        // printf("after clear: %s\n", ArithToUint256(arNonce).GetHex().c_str());
+            // printf("after clear: %s\n", ArithToUint256(arNonce).GetHex().c_str());
 
-        hashWriter << ArithToUint256(arNonce);
-        nNonce = CPOSNonce(ArithToUint256(UintToArith256(hashWriter.GetHash()) << 128 | arNonce));
+            hashWriter << ArithToUint256(arNonce);
+            nNonce = CPOSNonce(ArithToUint256(UintToArith256(hashWriter.GetHash()) << 128 | arNonce));
 
-        // printf(" after svpt: %s\n", nNonce.GetHex().c_str());
+            // printf(" after svpt: %s\n", nNonce.GetHex().c_str());
+        }
+        else
+        {
+            CVerusHashWriter hashWriter = CVerusHashWriter(SER_GETHASH, PROTOCOL_VERSION);
+
+            arith_uint256 arNonce = UintToArith256(nNonce);
+
+            // printf("before svpt: %s\n", ArithToUint256(arNonce).GetHex().c_str());
+
+            arNonce = (arNonce & CPOSNonce::entropyMask) | nBits;
+
+            // printf("after clear: %s\n", ArithToUint256(arNonce).GetHex().c_str());
+
+            hashWriter << ArithToUint256(arNonce);
+            nNonce = CPOSNonce(ArithToUint256(UintToArith256(hashWriter.GetHash()) << 128 | arNonce));
+
+            // printf(" after svpt: %s\n", nNonce.GetHex().c_str());
+        }
+    }
+
+    bool SetVersionByHeight(uint32_t height)
+    {
+        CVerusSolutionVector vsv = CVerusSolutionVector(nSolution);
+        if (vsv.SetVersionByHeight(height) && vsv.Version() > 0)
+        {
+            nVersion = VERUS_V2;
+        }
+    }
+
+    static uint32_t GetVersionByHeight(uint32_t height)
+    {
+        if (CVerusSolutionVector::GetVersionByHeight(height) > 0)
+        {
+            return VERUS_V2;
+        }
+        else
+        {
+            return CURRENT_VERSION;
+        }
     }
 };
 
@@ -156,7 +201,7 @@ class CNetworkBlockHeader : public CBlockHeader
     ADD_SERIALIZE_METHODS;
 
     template <typename Stream, typename Operation>
-    inline void SerializationOp(Stream& s, Operation ser_action, int nType, int nVersion) {
+    inline void SerializationOp(Stream& s, Operation ser_action) {
         READWRITE(*(CBlockHeader*)this);
         READWRITE(compatVec);
     }
@@ -191,7 +236,7 @@ public:
     ADD_SERIALIZE_METHODS;
 
     template <typename Stream, typename Operation>
-    inline void SerializationOp(Stream& s, Operation ser_action, int nType, int nVersion) {
+    inline void SerializationOp(Stream& s, Operation ser_action) {
         READWRITE(*(CBlockHeader*)this);
         READWRITE(vtx);
     }
@@ -209,7 +254,7 @@ public:
         block.nVersion       = nVersion;
         block.hashPrevBlock  = hashPrevBlock;
         block.hashMerkleRoot = hashMerkleRoot;
-        block.hashReserved   = hashReserved;
+        block.hashFinalSaplingRoot   = hashFinalSaplingRoot;
         block.nTime          = nTime;
         block.nBits          = nBits;
         block.nNonce         = nNonce;
@@ -251,12 +296,11 @@ public:
     ADD_SERIALIZE_METHODS;
 
     template <typename Stream, typename Operation>
-    inline void SerializationOp(Stream& s, Operation ser_action, int nType, int nVersion) {
+    inline void SerializationOp(Stream& s, Operation ser_action) {
         READWRITE(this->nVersion);
-        nVersion = this->nVersion;
         READWRITE(hashPrevBlock);
         READWRITE(hashMerkleRoot);
-        READWRITE(hashReserved);
+        READWRITE(hashFinalSaplingRoot);
         READWRITE(nTime);
         READWRITE(nBits);
     }
@@ -281,8 +325,9 @@ struct CBlockLocator
     ADD_SERIALIZE_METHODS;
 
     template <typename Stream, typename Operation>
-    inline void SerializationOp(Stream& s, Operation ser_action, int nType, int nVersion) {
-        if (!(nType & SER_GETHASH))
+    inline void SerializationOp(Stream& s, Operation ser_action) {
+        int nVersion = s.GetVersion();
+        if (!(s.GetType() & SER_GETHASH))
             READWRITE(nVersion);
         READWRITE(vHave);
     }

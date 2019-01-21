@@ -9,6 +9,7 @@
 #include "crypto/ripemd160.h"
 #include "crypto/sha256.h"
 #include "crypto/verus_hash.h"
+#include "prevector.h"
 #include "serialize.h"
 #include "uint256.h"
 #include "version.h"
@@ -121,21 +122,30 @@ inline uint160 Hash160(const std::vector<unsigned char>& vch)
     return Hash160(vch.begin(), vch.end());
 }
 
+/** Compute the 160-bit hash of a vector. */
+template<unsigned int N>
+inline uint160 Hash160(const prevector<N, unsigned char>& vch)
+{
+    return Hash160(vch.begin(), vch.end());
+}
+
 /** A writer stream (for serialization) that computes a 256-bit hash. */
 class CHashWriter
 {
 private:
     CHash256 ctx;
 
+    const int nType;
+    const int nVersion;
 public:
-    int nType;
-    int nVersion;
 
     CHashWriter(int nTypeIn, int nVersionIn) : nType(nTypeIn), nVersion(nVersionIn) {}
 
-    CHashWriter& write(const char *pch, size_t size) {
+    int GetType() const { return nType; }
+    int GetVersion() const { return nVersion; }
+
+    void write(const char *pch, size_t size) {
         ctx.Write((const unsigned char*)pch, size);
-        return (*this);
     }
 
     // invalidates the object
@@ -148,7 +158,7 @@ public:
     template<typename T>
     CHashWriter& operator<<(const T& obj) {
         // Serialize to this stream
-        ::Serialize(*this, obj, nType, nVersion);
+        ::Serialize(*this, obj);
         return (*this);
     }
 };
@@ -173,6 +183,9 @@ public:
             personal) == 0);
     }
 
+    int GetType() const { return nType; }
+    int GetVersion() const { return nVersion; }
+
     CBLAKE2bWriter& write(const char *pch, size_t size) {
         crypto_generichash_blake2b_update(&state, (const unsigned char*)pch, size);
         return (*this);
@@ -188,7 +201,7 @@ public:
     template<typename T>
     CBLAKE2bWriter& operator<<(const T& obj) {
         // Serialize to this stream
-        ::Serialize(*this, obj, nType, nVersion);
+        ::Serialize(*this, obj);
         return (*this);
     }
 };
@@ -224,7 +237,7 @@ public:
     template<typename T>
     CVerusHashWriter& operator<<(const T& obj) {
         // Serialize to this stream
-        ::Serialize(*this, obj, nType, nVersion);
+        ::Serialize(*this, obj);
         return (*this);
     }
 };
@@ -260,7 +273,45 @@ public:
     template<typename T>
     CVerusHashV2Writer& operator<<(const T& obj) {
         // Serialize to this stream
-        ::Serialize(*this, obj, nType, nVersion);
+        ::Serialize(*this, obj);
+        return (*this);
+    }
+};
+
+/** A writer stream (for serialization) that computes a 256-bit VerusHash 2.0 hash */
+class CVerusHashV2bWriter
+{
+private:
+    CVerusHashV2 state;
+
+public:
+    int nType;
+    int nVersion;
+
+    CVerusHashV2bWriter(int nTypeIn, int nVersionIn, uint64_t keysize=VERUSKEYSIZE) : 
+        nType(nTypeIn), nVersion(nVersionIn), state() {}
+
+    void Reset() { state.Reset(); }
+
+    CVerusHashV2bWriter& write(const char *pch, size_t size) {
+        state.Write((const unsigned char*)pch, size);
+        return (*this);
+    }
+
+    // invalidates the object for further writing
+    uint256 GetHash() {
+        uint256 result;
+        state.Finalize2b((unsigned char*)&result);
+        return result;
+    }
+
+    inline int64_t *xI64p() { return state.ExtraI64Ptr(); }
+    CVerusHashV2 &GetState() { return state; }
+
+    template<typename T>
+    CVerusHashV2bWriter& operator<<(const T& obj) {
+        // Serialize to this stream
+        ::Serialize(*this, obj);
         return (*this);
     }
 };
@@ -288,6 +339,17 @@ template<typename T>
 uint256 SerializeVerusHashV2(const T& obj, int nType=SER_GETHASH, int nVersion=PROTOCOL_VERSION)
 {
     CVerusHashV2Writer ss(nType, nVersion);
+    ss << obj;
+    return ss.GetHash();
+}
+
+/** Compute the 256-bit Verus hash of an object's serialization with the final step including
+ *  a carryless multiply-based hash as fill for the unused space.
+ */
+template<typename T>
+uint256 SerializeVerusHashV2b(const T& obj, verusclhasher *vlch=NULL, int nType=SER_GETHASH, int nVersion=PROTOCOL_VERSION)
+{
+    CVerusHashV2bWriter ss(nType, nVersion);
     ss << obj;
     return ss.GetHash();
 }

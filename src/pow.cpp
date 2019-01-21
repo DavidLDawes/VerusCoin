@@ -4,6 +4,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "pow.h"
+#include "consensus/upgrades.h"
 
 #include "arith_uint256.h"
 #include "chain.h"
@@ -21,7 +22,7 @@
 #endif // ENABLE_RUST
 uint32_t komodo_chainactive_timestamp();
 
-extern uint32_t ASSETCHAINS_ALGO, ASSETCHAINS_EQUIHASH, ASSETCHAINS_STAKED;
+extern uint32_t ASSETCHAINS_ALGO, ASSETCHAINS_EQUIHASH, ASSETCHAINS_VERUSHASH, ASSETCHAINS_STAKED, ASSETCHAINS_LWMAPOS;
 extern char ASSETCHAINS_SYMBOL[65];
 extern int32_t VERUS_BLOCK_POSUNITS, VERUS_CONSECUTIVE_POS_THRESHOLD, VERUS_NOPOS_THRESHHOLD;
 unsigned int lwmaGetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHeader *pblock, const Consensus::Params& params);
@@ -36,6 +37,20 @@ unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHead
     // Genesis block
     if (pindexLast == NULL )
         return nProofOfWorkLimit;
+
+    //{
+        // Comparing to pindexLast->nHeight with >= because this function
+        // returns the work required for the block after pindexLast.
+        //if (params.nPowAllowMinDifficultyBlocksAfterHeight != boost::none &&
+        //    pindexLast->nHeight >= params.nPowAllowMinDifficultyBlocksAfterHeight.get())
+        //{
+            // Special difficulty rule for testnet:
+            // If the new block's timestamp is more than 6 * 2.5 minutes
+            // then allow mining of a min-difficulty block.
+        //    if (pblock && pblock->GetBlockTime() > pindexLast->GetBlockTime() + params.nPowTargetSpacing * 6)
+        //        return nProofOfWorkLimit;
+        //}
+    //}
 
     // Find the first block in the averaging interval
     const CBlockIndex* pindexFirst = pindexLast;
@@ -99,16 +114,26 @@ unsigned int lwmaCalculateNextWorkRequired(const CBlockIndex* pindexLast, const 
 {
     arith_uint256 nextTarget {0}, sumTarget {0}, bnTmp, bnLimit;
     if (ASSETCHAINS_ALGO == ASSETCHAINS_EQUIHASH)
+    {
         bnLimit = UintToArith256(params.powLimit);
+    }
     else
+    {
         bnLimit = UintToArith256(params.powAlternate);
-
-    unsigned int nProofOfWorkLimit = bnLimit.GetCompact();
+    }
 
     // Find the first block in the averaging interval as we total the linearly weighted average
     const CBlockIndex* pindexFirst = pindexLast;
     const CBlockIndex* pindexNext;
     int64_t t = 0, solvetime, k = params.nLwmaAjustedWeight, N = params.nPowAveragingWindow;
+
+    // if changing from VerusHash V1 to V2, shift the last blocks by the same shift as the limit
+    int targetShift = 0;
+    if (CConstVerusSolutionVector::activationHeight.ActiveVersion(pindexLast->GetHeight() + 1))
+    {
+        bnLimit <<= VERUSHASH2_SHIFT;
+        targetShift = VERUSHASH2_SHIFT;
+    }
 
     for (int i = 0, j = N - 1; pindexFirst && i < N; i++, j--) {
         pindexNext = pindexFirst;
@@ -125,12 +150,16 @@ unsigned int lwmaCalculateNextWorkRequired(const CBlockIndex* pindexLast, const 
         // The factor is a part of the final equation. However we divide 
         // here to avoid potential overflow.
         bnTmp.SetCompact(pindexNext->nBits);
+        if (targetShift && !CConstVerusSolutionVector::activationHeight.ActiveVersion(pindexNext->GetHeight()))
+        {
+            bnTmp <<= targetShift;
+        }
         sumTarget += bnTmp / (k * N * N);
     }
 
     // Check we have enough blocks
     if (!pindexFirst)
-        return nProofOfWorkLimit;
+        return bnLimit.GetCompact();
 
     // Keep t reasonable in case strange solvetimes occurred.
     if (t < N * k / 3)
@@ -148,7 +177,7 @@ bool DoesHashQualify(const CBlockIndex *pbindex)
 {
     // if it fails hash test and PoW validation, consider it POS. it could also be invalid
     arith_uint256 hash = UintToArith256(pbindex->GetBlockHash());
-    // to be considered POS, we first can't qualify as POW
+    // to be considered POS in Komodo POS, non VerusPoS, we first can't qualify as POW
     if (hash > hash.SetCompact(pbindex->nBits))
     {
         return false;
@@ -229,7 +258,7 @@ uint32_t lwmaGetNextPOSRequired(const CBlockIndex* pindexLast, const Consensus::
         if (x)
         {
             idx[i].consecutive = false;
-            if (!memcmp(ASSETCHAINS_SYMBOL, "VRSC", 4) && pindexLast->nHeight < 67680)
+            if (!memcmp(ASSETCHAINS_SYMBOL, "VRSC", 4) && pindexLast->GetHeight() < 67680)
             {
                 idx[i].solveTime = VERUS_BLOCK_POSUNITS * (x + 1);
             }
@@ -322,14 +351,6 @@ bool CheckEquihashSolution(const CBlockHeader *pblock, const CChainParams& param
     // H(I||V||...
     crypto_generichash_blake2b_update(&state, (unsigned char*)&ss[0], ss.size());
 
-    #ifdef ENABLE_RUST
-    // Ensure that our Rust interactions are working in production builds. This is
-    // temporary and should be removed.
-    {
-        assert(librustzcash_xor(0x0f0f0f0f0f0f0f0f, 0x1111111111111111) == 0x1e1e1e1e1e1e1e1e);
-    }
-    #endif // ENABLE_RUST
-
     bool isValid;
     EhIsValidSolution(n, k, state, pblock->nSolution, isValid);
 
@@ -408,7 +429,24 @@ bool CheckProofOfWork(const CBlockHeader &blkHeader, uint8_t *pubkey33, int32_t 
             }
         }
     }
-    arith_uint256 bnLimit = (height <= 1 || ASSETCHAINS_ALGO == ASSETCHAINS_EQUIHASH) ? UintToArith256(params.powLimit) : UintToArith256(params.powAlternate);
+
+    arith_uint256 bnLimit;
+    if (height <= 1 || ASSETCHAINS_ALGO == ASSETCHAINS_EQUIHASH)
+    {
+        bnLimit = UintToArith256(params.powLimit);
+    }
+    else if (ASSETCHAINS_ALGO == ASSETCHAINS_VERUSHASH)
+    {
+        if (CConstVerusSolutionVector::activationHeight.ActiveVersion(height) == CConstVerusSolutionVector::activationHeight.SOLUTION_VERUSV2)
+        {
+            bnLimit = UintToArith256(params.powAlternate) << VERUSHASH2_SHIFT;
+        }
+        else
+        {
+            bnLimit = UintToArith256(params.powAlternate);
+        }
+    }
+
     if (fNegative || bnTarget == 0 || fOverflow || bnTarget > bnLimit)
         return error("CheckProofOfWork(): nBits below minimum work");
     if ( ASSETCHAINS_STAKED != 0 )
@@ -425,6 +463,7 @@ bool CheckProofOfWork(const CBlockHeader &blkHeader, uint8_t *pubkey33, int32_t 
         if ( ASSETCHAINS_SYMBOL[0] != 0 || height > 792000 )
         {
             //if ( 0 && height > 792000 )
+            if ( Params().NetworkIDString() != "regtest" )
             {
                 for (i=31; i>=0; i--)
                     fprintf(stderr,"%02x",((uint8_t *)&hash)[i]);
@@ -451,33 +490,56 @@ bool CheckProofOfWork(const CBlockHeader &blkHeader, uint8_t *pubkey33, int32_t 
     return true;
 }
 
-arith_uint256 GetBlockProof(const CBlockIndex& block)
+CChainPower GetBlockProof(const CBlockIndex& block)
 {
-    arith_uint256 bnTarget;
+    arith_uint256 bnWorkTarget, bnStakeTarget = arith_uint256(0);
+
     bool fNegative;
     bool fOverflow;
-    bnTarget.SetCompact(block.nBits, &fNegative, &fOverflow);
+    bnWorkTarget.SetCompact(block.nBits, &fNegative, &fOverflow);
 
-    if (fNegative || fOverflow || bnTarget == 0)
-        return 0;
-    // We need to compute 2**256 / (bnTarget+1), but we can't represent 2**256
-    // as it's too large for a arith_uint256. However, as 2**256 is at least as large
-    // as bnTarget+1, it is equal to ((2**256 - bnTarget - 1) / (bnTarget+1)) + 1,
-    // or ~bnTarget / (nTarget+1) + 1.
-    return (~bnTarget / (bnTarget + 1)) + 1;
+    if (fNegative || fOverflow || bnWorkTarget == 0)
+        return CChainPower(0);
+
+    CBlockHeader header = block.GetBlockHeader();
+
+    // if POS block, add stake
+    if (!NetworkUpgradeActive(block.GetHeight(), Params().GetConsensus(), Consensus::UPGRADE_SAPLING) || !header.IsVerusPOSBlock())
+    {
+        return CChainPower(0, bnStakeTarget, (~bnWorkTarget / (bnWorkTarget + 1)) + 1);
+    }
+    else
+    {
+        bnStakeTarget.SetCompact(header.GetVerusPOSTarget(), &fNegative, &fOverflow);
+        if (fNegative || fOverflow || bnStakeTarget == 0)
+            return CChainPower(0);
+        // as the nonce has a fixed definition for a POS block, add the random amount of "work" from the nonce, so there will
+        // statistically always be a deterministic winner in POS
+        arith_uint256 aNonce;
+
+        // random amount of additional stake added is capped to 1/2 the current stake target
+        aNonce = UintToArith256(block.nNonce) | (bnStakeTarget << (uint64_t)1);
+
+        // We need to compute 2**256 / (bnTarget+1), but we can't represent 2**256
+        // as it's too large for a arith_uint256. However, as 2**256 is at least as large
+        // as bnTarget+1, it is equal to ((2**256 - bnTarget - 1) / (bnTarget+1)) + 1,
+        // or ~bnTarget / (nTarget+1) + 1.
+        return CChainPower(0, ((~bnStakeTarget / (bnStakeTarget + 1)) + 1) + ((~aNonce / (aNonce + 1)) + 1),
+                        (~bnWorkTarget / (bnWorkTarget + 1)) + 1);
+    }
 }
 
 int64_t GetBlockProofEquivalentTime(const CBlockIndex& to, const CBlockIndex& from, const CBlockIndex& tip, const Consensus::Params& params)
 {
     arith_uint256 r;
     int sign = 1;
-    if (to.nChainWork > from.nChainWork) {
-        r = to.nChainWork - from.nChainWork;
+    if (to.chainPower.chainWork > from.chainPower.chainWork) {
+        r = to.chainPower.chainWork - from.chainPower.chainWork;
     } else {
-        r = from.nChainWork - to.nChainWork;
+        r = from.chainPower.chainWork - to.chainPower.chainWork;
         sign = -1;
     }
-    r = r * arith_uint256(params.nPowTargetSpacing) / GetBlockProof(tip);
+    r = r * arith_uint256(params.nPowTargetSpacing) / GetBlockProof(tip).chainWork;
     if (r.bits() > 63) {
         return sign * std::numeric_limits<int64_t>::max();
     }
