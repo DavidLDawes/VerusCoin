@@ -32,14 +32,15 @@ BITCOIN_INCLUDES += -I$(srcdir)/snark/libsnark
 BITCOIN_INCLUDES += -I$(srcdir)/univalue/include
 
 if TARGET_WINDOWS
-LIBBITCOIN_SERVER=libbitcoin_server.a -lcurl
+LIBBITCOIN_SERVER=libbitcoin_server.a
 endif
 if TARGET_DARWIN
-LIBBITCOIN_SERVER=libbitcoin_server.a -lcurl
+LIBBITCOIN_SERVER=libbitcoin_server.a
 else
-LIBBITCOIN_SERVER=libbitcoin_server.a -lcurl
+LIBBITCOIN_SERVER=libbitcoin_server.a
 endif
 
+LIBCURL=/tmp/curl/lib/libcurl.a
 LIBBITCOIN_WALLET=libbitcoin_wallet.a
 LIBBITCOIN_COMMON=libbitcoin_common.a
 LIBBITCOIN_CLI=libbitcoin_cli.a
@@ -52,7 +53,7 @@ LIBCRYPTOCONDITIONS=cryptoconditions/libcryptoconditions_core.la
 LIBSNARK=snark/libsnark.a
 LIBUNIVALUE=univalue/libunivalue.la
 LIBZCASH=libzcash.a
-
+LIBZ=/home/Downloads/zlib-1.2.11/libz.a
 if ENABLE_ZMQ
 LIBBITCOIN_ZMQ=libbitcoin_zmq.a
 endif
@@ -440,8 +441,8 @@ crypto_libbitcoin_crypto_a_SOURCES += \
 endif
 
 # Verus hash specific library - optimized
-crypto_libverus_crypto_a_CPPFLAGS = -O3 -Wint-conversion -march=x86-64 -mpclmul -msse4 -msse4.1 -msse4.2 -mssse3 -mavx -maes -g -funroll-loops -fomit-frame-pointer -fPIC $(AM_CPPFLAGS)
-crypto_libverus_crypto_a_CXXFLAGS = -O3 -Wint-conversion -march=x86-64 -mpclmul -msse4 -msse4.1 -msse4.2 -mssse3 -mavx -maes -g -funroll-loops -fomit-frame-pointer -fPIC $(AM_CXXFLAGS)
+crypto_libverus_crypto_a_CPPFLAGS = -O3 -march=x86-64 -mpclmul -msse4 -msse4.1 -msse4.2 -mssse3 -mavx -maes -g -funroll-loops -fomit-frame-pointer -fPIC $(AM_CPPFLAGS)
+crypto_libverus_crypto_a_CXXFLAGS = -O3 -march=x86-64 -mpclmul -msse4 -msse4.1 -msse4.2 -mssse3 -mavx -maes -g -funroll-loops -fomit-frame-pointer -fPIC $(AM_CXXFLAGS)
 crypto_libverus_crypto_a_SOURCES = \
   crypto/haraka.h \
   crypto/haraka.c \
@@ -449,8 +450,8 @@ crypto_libverus_crypto_a_SOURCES = \
   crypto/verus_clhash.cpp
 
 # Verus hash specific library - portable
-crypto_libverus_portable_crypto_a_CPPFLAGS = -O3 -Wint-conversion -march=x86-64 -g -funroll-loops -fomit-frame-pointer -fPIC $(AM_CPPFLAGS)
-crypto_libverus_portable_crypto_a_CXXFLAGS = -O3 -Wint-conversion -march=x86-64 -g -funroll-loops -fomit-frame-pointer -fPIC $(AM_CXXFLAGS)
+crypto_libverus_portable_crypto_a_CPPFLAGS = -O3 -march=x86-64 -g -funroll-loops -fomit-frame-pointer -fPIC $(AM_CPPFLAGS)
+crypto_libverus_portable_crypto_a_CXXFLAGS = -O3 -march=x86-64 -g -funroll-loops -fomit-frame-pointer -fPIC $(AM_CXXFLAGS)
 crypto_libverus_portable_crypto_a_SOURCES = \
   crypto/haraka_portable.h \
   crypto/haraka_portable.c \
@@ -566,6 +567,8 @@ komodod_LDADD = \
   $(LIBLEVELDB) \
   $(LIBMEMENV) \
   $(LIBSECP256K1) \
+  $(LIBCURL) \
+  $(LIBZ) \
   $(LIBCRYPTOCONDITIONS)
 
 if ENABLE_WALLET
