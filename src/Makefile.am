@@ -40,7 +40,7 @@ else
 LIBBITCOIN_SERVER=libbitcoin_server.a
 endif
 
-LIBCURL=/tmp/curl/lib/libcurl.a
+LIBCURL=/curl-7.64.0/lib/libcurl.a
 LIBBITCOIN_WALLET=libbitcoin_wallet.a
 LIBBITCOIN_COMMON=libbitcoin_common.a
 LIBBITCOIN_CLI=libbitcoin_cli.a
