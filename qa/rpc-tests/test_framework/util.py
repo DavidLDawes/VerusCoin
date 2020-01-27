@@ -85,9 +85,9 @@ def initialize_datadir(dirname, n):
     if not os.path.isdir(datadir):
         os.makedirs(datadir)
     # kmd AC's don't use this, they use the conf auto-created when the AC is created
-    # plus CLI arguments. This is for komodod tests
-    print("Writing to " + os.path.join(datadir,"VERUS.conf"))
-    with open(os.path.join(datadir, "VERUS.conf"), 'w') as f:
+    # plus CLI arguments. This is for verusd tests
+    print("Writing to " + os.path.join(datadir,"VRSC.conf"))
+    with open(os.path.join(datadir, "VRSC.conf"), 'w') as f:
         f.write("regtest=1\n");
         f.write("txindex=1\n");
         f.write("server=1\n");
@@ -109,13 +109,13 @@ def initialize_chain(test_dir):
     """
     Create (or copy from cache) a 200-block-long chain and
     4 wallets.
-    komodod and komodo-cli must be in search path.
+    verusd and verus must be in search path.
     """
 
     print("initialize_chain")
     if not os.path.isdir(os.path.join("cache", "node0")):
         devnull = open("/dev/null", "w+")
-        # Create cache directories, run komodods:
+        # Create cache directories, run verusds:
         for i in range(4):
             datadir=initialize_datadir("cache", i)
             args = [ os.getenv("VERUSD", "verusd"), "-keypool=1", "-datadir="+datadir, "-discover=0" ]
@@ -203,7 +203,7 @@ def _rpchost_to_args(rpchost):
 
 def start_node(i, dirname, extra_args=None, rpchost=None, timewait=None, binary=None):
     """
-    Start a komodod and return RPC connection to it
+    Start a verusd and return RPC connection to it
     """
     datadir = os.path.join(dirname, "node"+str(i))
     if binary is None:
