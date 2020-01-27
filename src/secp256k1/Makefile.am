@@ -90,18 +90,6 @@ bench_internal_CPPFLAGS = -DSECP256K1_BUILD $(SECP_INCLUDES)
 endif
 
 TESTS =
-if USE_TESTS
-noinst_PROGRAMS += tests
-tests_SOURCES = src/tests.c
-tests_CPPFLAGS = -DSECP256K1_BUILD -I$(top_srcdir)/src -I$(top_srcdir)/include $(SECP_INCLUDES) $(SECP_TEST_INCLUDES)
-if !ENABLE_COVERAGE
-tests_CPPFLAGS += -DVERIFY
-endif
-tests_LDADD = $(SECP_LIBS) $(SECP_TEST_LIBS) $(COMMON_LIB)
-tests_LDFLAGS = -static
-TESTS += tests
-endif
-
 if USE_EXHAUSTIVE_TESTS
 noinst_PROGRAMS += exhaustive_tests
 exhaustive_tests_SOURCES = src/tests_exhaustive.c
