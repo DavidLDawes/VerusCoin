@@ -86,15 +86,15 @@ def initialize_datadir(dirname, n):
         os.makedirs(datadir)
     # kmd AC's don't use this, they use the conf auto-created when the AC is created
     # plus CLI arguments. This is for komodod tests
-    print("Writing to " + os.path.join(datadir,"komodo.conf"))
-    with open(os.path.join(datadir, "komodo.conf"), 'w') as f:
+    print("Writing to " + os.path.join(datadir,"VERUS.conf"))
+    with open(os.path.join(datadir, "VERUS.conf"), 'w') as f:
         f.write("regtest=1\n");
         f.write("txindex=1\n");
         f.write("server=1\n");
         f.write("showmetrics=0\n");
         f.write("rpcuser=rt\n");
         f.write("rpcpassword=rt\n");
-        #f.write("port="+str(p2p_port(n))+"\n");
+        f.write("port="+str(p2p_port(27486))+"\n");
         #rpcport = str(rpc_port(n))
         #f.write("rpcport="+rpcport+"\n");
         #print "RPC port=" + rpcport
@@ -118,21 +118,21 @@ def initialize_chain(test_dir):
         # Create cache directories, run komodods:
         for i in range(4):
             datadir=initialize_datadir("cache", i)
-            args = [ os.getenv("BITCOIND", "komodod"), "-keypool=1", "-datadir="+datadir, "-discover=0" ]
+            args = [ os.getenv("VERUSD", "verusd"), "-keypool=1", "-datadir="+datadir, "-discover=0" ]
             if i > 0:
                 args.append("-connect=127.0.0.1:"+str(p2p_port(0)))
             bitcoind_processes[i] = subprocess.Popen(args)
-            cmd      = os.getenv("BITCOINCLI", "komodo-cli")
+            cmd      = os.getenv("VERUSCLI", "verus")
             cmd_args = cmd + " -datadir="+datadir + " -rpcwait getblockcount"
             if os.getenv("PYTHON_DEBUG", ""):
-                print "initialize_chain: komodod started, calling: " + cmd_args
+                print "initialize_chain: verusd started, calling: " + cmd_args
             strcmd = cmd + " " + "-datadir="+datadir + " -rpcwait getblockcount"
 
             print("Running " + strcmd)
             subprocess.check_call(strcmd, shell=True);
             #subprocess.check_call([ cmd, "-rpcwait", "getblockcount"], stdout=devnull)
             if os.getenv("PYTHON_DEBUG", ""):
-                print "initialize_chain: komodo-cli -rpcwait getblockcount completed"
+                print "initialize_chain: verus -rpcwait getblockcount completed"
         devnull.close()
         rpcs = []
         for i in range(4):
@@ -167,7 +167,7 @@ def initialize_chain(test_dir):
             os.remove(log_filename("cache", i, "fee_estimates.dat"))
 
     for i in range(4):
-        from_dir = os.path.join("cache", "node"+str(i))
+        from_dir = os.path.join("cache", "node0")
         to_dir = os.path.join(test_dir,  "node"+str(i))
         shutil.copytree(from_dir, to_dir)
         initialize_datadir(test_dir, i) # Overwrite port/rpcport in komodo.conf
@@ -207,29 +207,29 @@ def start_node(i, dirname, extra_args=None, rpchost=None, timewait=None, binary=
     """
     datadir = os.path.join(dirname, "node"+str(i))
     if binary is None:
-        binary = os.getenv("BITCOIND", "komodod")
+        binary = os.getenv("VERUSD", "verusd")
     args = [ binary, "-datadir="+datadir, "-keypool=1", "-discover=0", "-rest" ]
     if extra_args is not None: args.extend(extra_args)
     #print("args=" + ' '.join(args))
     bitcoind_processes[i] = subprocess.Popen(args)
     devnull = open("/dev/null", "w+")
 
-    cmd = os.getenv("BITCOINCLI", "komodo-cli")
+    cmd = os.getenv("VERUSCLI", "verus")
     print("cmd=" + cmd)
     cmd_args = ' '.join(extra_args) + " -rpcwait getblockcount "
     if os.getenv("PYTHON_DEBUG", ""):
-        print "start_node: komodod started, calling : " + cmd + " " + cmd_args
+        print "start_node: verusd started, calling : " + cmd + " " + cmd_args
     strcmd = cmd + " " + cmd_args
 
     print("Running " + strcmd)
     import time
     time.sleep(2)
     subprocess.check_call(strcmd, shell=True);
-    #subprocess.check_call([ os.getenv("BITCOINCLI", "komodo-cli"), "-datadir="+datadir] +
+    #subprocess.check_call([ os.getenv("VERUSCLI", "verus"), "-datadir="+datadir] +
     #                      _rpchost_to_args(rpchost)  +
     #                      ["-rpcwait", "-rpcport=6438", "getblockcount"], stdout=devnull)
     if os.getenv("PYTHON_DEBUG", ""):
-        print "start_node: calling komodo-cli -rpcwait getblockcount returned"
+        print "start_node: calling verus -rpcwait getblockcount returned"
     devnull.close()
     if extra_args[0] == '-ac_name=REGTEST':
         url = "http://rt:rt@%s:%d" % (rpchost or '127.0.0.1', 64368)

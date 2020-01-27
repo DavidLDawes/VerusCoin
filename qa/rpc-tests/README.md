@@ -9,6 +9,10 @@ Generally useful functions.
 
 Notes
 =====
+Failed due to lack of pyblake2 so run 
+```
+pip install pyblake2
+```
 
 You can run a single test by calling `qa/pull-tester/rpc-tests.sh <testname>`.
 
