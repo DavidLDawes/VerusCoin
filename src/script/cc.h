@@ -22,11 +22,15 @@ const int CCEnabledTypes = 1 << CC_Secp256k1 | \
 
 const int CCSigningNodes = 1 << CC_Ed25519 | 1 << CC_Secp256k1;
 
+const int CCEvalNode = 1 << CC_Eval;
+
+const int CCFirstEvalOnly = 2;
+const int CCLastEvalOnly = 0x0d;
 
 /*
  * Check if the server can accept the condition based on it's structure / types
  */
-bool IsSupportedCryptoCondition(const CC *cond);
+bool IsSupportedCryptoCondition(const CC *cond, int evalCode);
 
 
 /*
@@ -41,14 +45,15 @@ bool IsSignedCryptoCondition(const CC *cond);
 CC* CCNewPreimage(std::vector<unsigned char> preimage);
 CC* CCNewEval(std::vector<unsigned char> code);
 CC* CCNewSecp256k1(CPubKey k);
+CC* CCNewHashedSecp256k1(CKeyID keyID);
 CC* CCNewThreshold(int t, std::vector<CC*> v);
 
 
 /*
- * Turn a condition into a scriptPubKey
+ * Turn a condition into a scriptPubKey or just the vector inside
  */
 CScript CCPubKey(const CC *cond);
-
+std::vector<unsigned char> CCPubKeyVec(const CC *cond);
 
 /*
  * Turn a condition into a scriptSig
@@ -63,6 +68,12 @@ CScript CCSig(const CC *cond);
  * Note: This will fail in undefined ways if the condition is missing signatures
  */
 std::vector<unsigned char> CCSigVec(const CC *cond);
+
+/*
+ * Turn a partial fulfillment that may still need more signatures into a scriptSig
+ *
+ */
+std::vector<unsigned char> CCPartialSigVec(const CC *cond);
 
 /*
  * Produces a string showing the structure of a CC condition

@@ -33,7 +33,7 @@ const CScriptExt &CScriptExt::AddPayToPubKeyHash(const CKeyID &key) const
 const CScriptExt &CScriptExt::OpReturnScript(const vector<unsigned char> &data, unsigned char opretType) const
 {
     ((CScript *)this)->clear();
-    if (data.size() < MAX_SCRIPT_ELEMENT_SIZE)
+    if (data.size() < CScript::MAX_SCRIPT_ELEMENT_SIZE)
     {
         vector<unsigned char> scratch = vector<unsigned char>(data);
         scratch.insert(scratch.begin(), opretType);
@@ -70,6 +70,7 @@ const CScriptExt &CScriptExt::AddCheckLockTimeVerify(int64_t unlocktime) const
         *((CScript *)this) << OP_DROP;
         return *this;
     }
+    return *this;
 }
 
 // combined CLTV script and P2PKH
@@ -94,14 +95,14 @@ bool CScriptExt::ExtractVoutDestination(const CTransaction& tx, int32_t voutNum,
     CScriptExt spk = tx.vout[voutNum].scriptPubKey;
 
     // if this is a timelocked transaction, get the destination behind the time lock
-    if (tx.IsCoinBase() && tx.vout.size() == 2 && voutNum == 0 &&
+    if (tx.IsCoinBase() && voutNum == 0 &&
         spk.IsPayToScriptHash(&scriptHash) &&
-        tx.vout[1].scriptPubKey.IsOpReturn())
+        tx.vout.back().scriptPubKey.IsOpReturn())
     {
         opcodetype op;
         std::vector<uint8_t> opretData = std::vector<uint8_t>();
-        CScript::const_iterator it = tx.vout[1].scriptPubKey.begin() + 1;
-        if (tx.vout[1].scriptPubKey.GetOp2(it, op, &opretData))
+        CScript::const_iterator it = tx.vout.back().scriptPubKey.begin() + 1;
+        if (tx.vout.back().scriptPubKey.GetOp2(it, op, &opretData))
         {
             if (opretData.size() > 0 && opretData[0] == OPRETTYPE_TIMELOCK)
             {

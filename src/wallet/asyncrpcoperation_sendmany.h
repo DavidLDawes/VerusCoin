@@ -1,6 +1,6 @@
 // Copyright (c) 2016 The Zcash developers
 // Distributed under the MIT software license, see the accompanying
-// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+// file COPYING or https://www.opensource.org/licenses/mit-license.php .
 
 #ifndef ASYNCRPCOPERATION_SENDMANY_H
 #define ASYNCRPCOPERATION_SENDMANY_H
@@ -12,7 +12,7 @@
 #include "zcash/JoinSplit.hpp"
 #include "zcash/Address.hpp"
 #include "wallet.h"
-#include "paymentdisclosure.h"
+#include "wallet/paymentdisclosure.h"
 
 #include <array>
 #include <unordered_map>
@@ -29,7 +29,7 @@ using namespace libzcash;
 typedef std::tuple<std::string, CAmount, std::string> SendManyRecipient;
 
 // Input UTXO is a tuple (quadruple) of txid, vout, amount, coinbase)
-typedef std::tuple<uint256, int, CAmount, bool, CTxDestination> SendManyInputUTXO;
+typedef std::tuple<uint256, int, CAmount, bool, CScript> SendManyInputUTXO;
 
 // Input JSOP is a tuple of JSOutpoint, note and amount
 typedef std::tuple<JSOutPoint, SproutNote, CAmount> SendManyInputJSOP;
@@ -107,11 +107,11 @@ private:
 
     TransactionBuilder builder_;
     CTransaction tx_;
-   
-    void add_taddr_change_output_to_tx(CBitcoinAddress *fromaddress,CAmount amount);
+
+    void add_taddr_change_output_to_tx(CReserveKey& keyChange, CAmount amount);
     void add_taddr_outputs_to_tx();
     bool find_unspent_notes();
-    bool find_utxos(bool fAcceptCoinbase);
+    bool find_utxos(bool fAcceptProtectedCoinbase);
     std::array<unsigned char, ZC_MEMO_SIZE> get_memo_from_hex_string(std::string s);
     bool main_impl();
 
@@ -126,8 +126,6 @@ private:
         AsyncJoinSplitInfo & info,
         std::vector<boost::optional < SproutWitness>> witnesses,
         uint256 anchor);
-
-    void sign_send_raw_transaction(UniValue obj);     // throws exception if there was an error
 
     // payment disclosure!
     std::vector<PaymentDisclosureKeyInfo> paymentDisclosureData_;
@@ -150,9 +148,9 @@ public:
     }
     
     // Delegated methods
-    
-    void add_taddr_change_output_to_tx(CAmount amount) {
-        delegate->add_taddr_change_output_to_tx(0,amount);
+
+    void add_taddr_change_output_to_tx(CReserveKey& keyChange, CAmount amount) {
+        delegate->add_taddr_change_output_to_tx(keyChange, amount);
     }
     
     void add_taddr_outputs_to_tx() {
@@ -191,10 +189,6 @@ public:
         return delegate->perform_joinsplit(info, witnesses, anchor);
     }
 
-    void sign_send_raw_transaction(UniValue obj) {
-        delegate->sign_send_raw_transaction(obj);
-    }
-    
     void set_state(OperationStatus state) {
         delegate->state_.store(state);
     }

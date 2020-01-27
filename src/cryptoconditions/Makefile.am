@@ -14,8 +14,14 @@ AM_CFLAGS = -I$(top_srcdir)/src/asn -I$(top_srcdir)/include -I$(top_srcdir)/src/
 
 LIBSECP256K1=src/include/secp256k1/libsecp256k1.la
 
+if ARCH_ARM
+PLATFORM_VARIANT = armv8.1-a+crypto
+else
+PLATFORM_VARIANT = x86-64
+endif
+
 $(LIBSECP256K1): $(wildcard src/secp256k1/*)
-	$(AM_V_at)$(MAKE) $(AM_MAKEFLAGS) -C $(@D) $(@F) -march:x86-64 -g
+	$(AM_V_at)$(MAKE) $(AM_MAKEFLAGS) -C $(@D) $(@F) -march:$(PLATFORM_VARIANT) -g
 
 CRYPTOCONDITIONS_CORE=libcryptoconditions_core.la
 
@@ -24,6 +30,11 @@ libcryptoconditions_core_la_SOURCES = \
 	src/utils.c \
 	src/include/cJSON.c \
 	src/include/sha256.c \
+	src/include/byte_order.c \
+	src/include/byte_order.h \
+	src/include/ripemd-160.c \
+	src/include/ripemd-160.h \
+	src/include/ustd.h \
 	src/include/ed25519/src/keypair.c \
 	src/include/ed25519/src/seed.c \
 	src/include/ed25519/src/verify.c \

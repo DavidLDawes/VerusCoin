@@ -1,7 +1,7 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2014 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
-// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+// file COPYING or https://www.opensource.org/licenses/mit-license.php .
 
 #ifndef BITCOIN_SCRIPT_SCRIPT_H
 #define BITCOIN_SCRIPT_SCRIPT_H
@@ -17,15 +17,19 @@
 #include <string.h>
 #include <string>
 #include <vector>
+#include "uint256.h"
+#include "pubkey.h"
 
 #define OPRETTYPE_TIMELOCK 1
 #define OPRETTYPE_STAKEPARAMS 2
 #define OPRETTYPE_STAKECHEAT 3
+#define OPRETTYPE_OBJECT 4
+#define OPRETTYPE_OBJECTARR 5
 
-static const unsigned int MAX_SCRIPT_ELEMENT_SIZE = 520; // bytes
+class CCurrencyState;
 
-// Max size of pushdata in a CC sig in bytes
-static const unsigned int MAX_SCRIPT_CRYPTOCONDITION_FULFILLMENT_SIZE = 2048;
+static const unsigned int MAX_SCRIPT_ELEMENT_SIZE_V2 = 1024;
+static const unsigned int MAX_SCRIPT_ELEMENT_SIZE_IDENTITY = 3073;    // fulfillment maximum size + 1, MAKE SURE TO KEEP MAX_BINARY_CC_SIZE IN SYNC WITH THIS-1, BUF_SIZE in crypto conditions, should be >=
 
 // Maximum script length in bytes
 static const int MAX_SCRIPT_SIZE = 10000;
@@ -363,6 +367,112 @@ private:
 
 typedef prevector<28, unsigned char> CScriptBase;
 
+class CKeyID;
+class CScript;
+class CKeyStore;
+
+class CNoDestination {
+public:
+    friend bool operator==(const CNoDestination &a, const CNoDestination &b) { return true; }
+    friend bool operator<(const CNoDestination &a, const CNoDestination &b) { return true; }
+};
+
+/** A reference to a CScript: the Hash160 of its serialization (see script.h) */
+class CScriptID : public uint160
+{
+public:
+    CScriptID() : uint160() {}
+    CScriptID(const CScript& in);
+    CScriptID(const uint160& in) : uint160(in) {}
+};
+
+uint160 GetNameID(const std::string &Name, const uint160 &parent);
+
+/** A reference to a CScript: the Hash160 of its serialization (see script.h) */
+class CIdentityID : public uint160
+{
+public:
+    CIdentityID() : uint160() {}
+    CIdentityID(const std::string& in, const uint160 &parent=uint160()) : uint160(GetNameID(in, parent)) {}
+    CIdentityID(const uint160& in) : uint160(in) {}
+};
+
+/** 
+ * A txout script template with a specific destination. It is either:
+ *  * CNoDestination: no destination set
+ *  * CKeyID: TX_PUBKEYHASH destination
+ *  * CScriptID: TX_SCRIPTHASH destination
+ *  A CTxDestination is the internal data type encoded in a bitcoin address
+ */
+typedef boost::variant<CNoDestination, CPubKey, CKeyID, CScriptID, CIdentityID> CTxDestination;
+
+class COptCCParams
+{
+    public:
+        static const uint8_t VERSION_V1 = 1;
+        static const uint8_t VERSION_V2 = 2;
+        static const uint8_t VERSION_V3 = 3;
+
+        static const uint8_t ADDRTYPE_INVALID = 0;
+        static const uint8_t ADDRTYPE_PK = 1;
+        static const uint8_t ADDRTYPE_PKH = 2;
+        static const uint8_t ADDRTYPE_SH = 3;
+        static const uint8_t ADDRTYPE_ID = 4;
+        static const uint8_t ADDRTYPE_LAST = 3;
+
+        uint8_t version;
+        uint8_t evalCode;
+        uint8_t m, n; // for m of n sigs required, n pub keys for sigs will follow
+        std::vector<CTxDestination> vKeys;
+        std::vector<std::vector<unsigned char>> vData; // extra parameters
+
+        COptCCParams() : version(0), evalCode(0), m(0), n(0) {}
+
+        COptCCParams(uint8_t ver, uint8_t code, uint8_t _m, uint8_t _n, const std::vector<CTxDestination> &vkeys, const std::vector<std::vector<unsigned char>> &vdata) : 
+            version(ver), evalCode(code), m(_m), n(_n), vKeys(vkeys), vData(vdata) {}
+
+        COptCCParams(std::vector<unsigned char> &vch);
+
+        bool IsValid() const { return version == VERSION_V1 || version == VERSION_V2 || version == VERSION_V3; }
+
+        std::vector<unsigned char> AsVector() const;
+};
+
+// used when creating crypto condition outputs
+template <typename T>
+class CConditionObj
+{
+public:
+    uint8_t evalCode;
+    int m;
+    const std::vector<CTxDestination> dests;
+    T obj;
+    bool objectValid;
+    CConditionObj(uint8_t eCode, const std::vector<CTxDestination> &Dests, int M, const T *pO=nullptr) : evalCode(eCode), m(M), dests(Dests), objectValid(false)
+    {
+        if (pO)
+        {
+            obj = *pO;
+            objectValid = true;
+        }
+    }
+    bool HaveObject() const
+    {
+        return objectValid;
+    }
+    T *ObjectPtr() const
+    {
+        if (HaveObject())
+        {
+            return &obj;
+        }
+        else
+        {
+            return nullptr;
+        }
+    }
+};
+
 /** Serialized script, used inside transaction inputs and outputs */
 class CScript : public CScriptBase
 {
@@ -385,6 +495,8 @@ protected:
     }
     bool GetBalancedData(const_iterator& pc, std::vector<std::vector<unsigned char>>& vSolutions) const;
 public:
+    static unsigned int MAX_SCRIPT_ELEMENT_SIZE; // bytes
+
     CScript() { }
     CScript(const CScript& b) : CScriptBase(b.begin(), b.end()) { }
     CScript(const_iterator pbegin, const_iterator pend) : CScriptBase(pbegin, pend) { }
@@ -581,11 +693,36 @@ public:
     bool IsOpReturn() const { return size() > 0 && (*this)[0] == OP_RETURN; }
     bool GetOpretData(std::vector<std::vector<unsigned char>>& vData) const;
 
-    bool IsPayToCryptoCondition(CScript *ccSubScript, std::vector<std::vector<unsigned char>>& vSolutions) const;
+    bool IsPayToCryptoCondition(COptCCParams &ccParams) const;
+    bool IsPayToCryptoCondition(CScript *ccSubScript, std::vector<std::vector<unsigned char>> &vParams, COptCCParams &optParams) const;
+    bool IsPayToCryptoCondition(CScript *ccSubScript, std::vector<std::vector<unsigned char>> &vParams) const;
     bool IsPayToCryptoCondition(CScript *ccSubScript) const;
+    bool IsPayToCryptoCondition(uint32_t *ecode) const;
     bool IsPayToCryptoCondition() const;
+    CScript &ReplaceCCParams(const COptCCParams &params);
+
+    int64_t ReserveOutValue() const;
+    int64_t ReserveOutValue(COptCCParams &p) const;
+    bool SetReserveOutValue(int64_t newValue);
+
     bool IsCoinImport() const;
     bool MayAcceptCryptoCondition() const;
+    bool MayAcceptCryptoCondition(int evalCode) const;
+    bool IsInstantSpend() const;
+
+    // insightexplorer, there may be more script types in the future
+    enum ScriptType : int {
+        UNKNOWN = 0,
+        P2PKH = 1,  // the same index value is used for all types that can have destinations represented by public key hash
+        P2PK = 1,
+        P2CC = 1,   // CCs are actually not an address type, but as a type of transaction, they are identified historicall as P2PKH. they now can also pay to IDs.
+        P2SH = 2,
+        P2ID = 3,
+    };
+
+    ScriptType GetType() const;
+    uint160 AddressHash() const;
+    std::vector<CTxDestination> GetDestinations() const;
 
     /** Called by IsStandardTx and P2SH/BIP62 VerifyScript (which makes it consensus-critical). */
     bool IsPushOnly() const;
@@ -614,6 +751,15 @@ public:
         // The default std::vector::clear() does not release memory.
         CScriptBase().swap(*this);
     }
+};
+
+class CReserveScript
+{
+public:
+    CScript reserveScript;
+    virtual void KeepScript() {}
+    CReserveScript() {}
+    virtual ~CReserveScript() {}
 };
 
 #endif // BITCOIN_SCRIPT_SCRIPT_H

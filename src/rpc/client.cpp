@@ -1,10 +1,12 @@
 // Copyright (c) 2010 Satoshi Nakamoto
 // Copyright (c) 2009-2014 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
-// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+// file COPYING or https://www.opensource.org/licenses/mit-license.php .
 
 #include "rpc/client.h"
 #include "rpc/protocol.h"
+#include "pbaas/crosschainrpc.h"
+#include "pbaas/identity.h"
 #include "util.h"
 
 #include <set>
@@ -13,13 +15,297 @@
 #include <univalue.h>
 
 using namespace std;
+extern std::string VERUS_CHAINNAME;
 
 class CRPCConvertParam
 {
 public:
-    std::string methodName;            //! method whose params want conversion
-    int paramIdx;                      //! 0-based idx of param to convert
+    std::string methodName; //!< method whose params want conversion
+    int paramIdx;           //!< 0-based idx of param to convert
 };
+
+// DUMMY for compile - only used in server
+UniValue RPCCallRoot(const string& strMethod, const UniValue& params, int timeout)
+{
+    assert(false);
+    return NullUniValue;
+}
+
+bool SetThisChain(UniValue &chainDefinition) {
+    return true; // (?) pbaas/pbaas.h
+}
+
+int32_t uni_get_int(UniValue uv, int32_t def)
+{
+    try
+    {
+        return uv.get_int();
+    }
+    catch(const std::exception& e)
+    {
+        return def;
+    }
+}
+
+bool uni_get_bool(UniValue uv, bool def)
+{
+    try
+    {
+        return uv.get_bool();
+    }
+    catch(const std::exception& e)
+    {
+        return def;
+    }
+}
+
+int64_t uni_get_int64(UniValue uv, int64_t def)
+{
+    try
+    {
+        return uv.get_int64();
+    }
+    catch(const std::exception& e)
+    {
+        return def;
+    }
+}
+
+std::string uni_get_str(UniValue uv, std::string def)
+{
+    try
+    {
+        return uv.get_str();
+    }
+    catch(const std::exception& e)
+    {
+        return def;
+    }
+}
+
+std::vector<UniValue> uni_getValues(UniValue uv, std::vector<UniValue> def)
+{
+    try
+    {
+        return uv.getValues();
+    }
+    catch(const std::exception& e)
+    {
+        return def;
+    }
+}
+
+uint160 CCrossChainRPCData::GetConditionID(uint160 cid, int32_t condition)
+{
+    CHashWriter hw(SER_GETHASH, PROTOCOL_VERSION);
+    hw << condition;
+    hw << cid;
+    uint256 chainHash = hw.GetHash();
+    return Hash160(chainHash.begin(), chainHash.end());
+}
+
+uint160 CCrossChainRPCData::GetConditionID(std::string name, int32_t condition)
+{
+    uint160 parent;
+    uint160 cid = CIdentity::GetID(name, parent);
+
+    CHashWriter hw(SER_GETHASH, PROTOCOL_VERSION);
+    hw << condition;
+    hw << cid;
+    uint256 chainHash = hw.GetHash();
+    return Hash160(chainHash.begin(), chainHash.end());
+}
+
+std::string TrimLeading(const std::string &Name, unsigned char ch)
+{
+    std::string nameCopy = Name;
+    int removeSpaces;
+    for (removeSpaces = 0; removeSpaces < nameCopy.size(); removeSpaces++)
+    {
+        if (nameCopy[removeSpaces] != ch)
+        {
+            break;
+        }
+    }
+    if (removeSpaces)
+    {
+        nameCopy.erase(nameCopy.begin(), nameCopy.begin() + removeSpaces);
+    }
+    return nameCopy;
+}
+
+std::string TrimTrailing(const std::string &Name, unsigned char ch)
+{
+    std::string nameCopy = Name;
+    int removeSpaces;
+    for (removeSpaces = nameCopy.size() - 1; removeSpaces >= 0; removeSpaces--)
+    {
+        if (nameCopy[removeSpaces] != ch)
+        {
+            break;
+        }
+    }
+    nameCopy.resize(nameCopy.size() - ((nameCopy.size() - 1) - removeSpaces));
+    return nameCopy;
+}
+
+std::vector<std::string> ParseSubNames(const std::string &Name, std::string &ChainOut, bool displayfilter)
+{
+    std::string nameCopy = Name;
+    std::string invalidChars = "\\/:*?\"<>|";
+    if (displayfilter)
+    {
+        invalidChars += "\n\t\r\b\t\v\f\x1B";
+    }
+    for (int i = 0; i < nameCopy.size(); i++)
+    {
+        if (invalidChars.find(nameCopy[i]) != std::string::npos)
+        {
+            return std::vector<std::string>();
+        }
+    }
+
+    std::vector<std::string> retNames;
+    boost::split(retNames, nameCopy, boost::is_any_of("@"));
+    if (!retNames.size() || retNames.size() > 2)
+    {
+        return std::vector<std::string>();
+    }
+
+    bool explicitChain = false;
+    if (retNames.size() == 2)
+    {
+        ChainOut = retNames[1];
+        explicitChain = true;
+    }    
+
+    nameCopy = retNames[0];
+    boost::split(retNames, nameCopy, boost::is_any_of("."));
+
+    for (int i = 0; i < retNames.size(); i++)
+    {
+        if (retNames[i].size() > KOMODO_ASSETCHAIN_MAXLEN - 1)
+        {
+            retNames[i] = std::string(retNames[i], 0, (KOMODO_ASSETCHAIN_MAXLEN - 1));
+        }
+        // spaces are allowed, but no sub-name can have leading or trailing spaces
+        if (!retNames[i].size() || retNames[i] != TrimTrailing(TrimLeading(retNames[i], ' '), ' '))
+        {
+            return std::vector<std::string>();
+        }
+    }
+
+    // if no chain is specified, default to chain of the ID
+    if (!explicitChain && retNames.size())
+    {
+        if (retNames.size() == 1)
+        {
+            // by default, we assume the Verus chain for no suffix
+            ChainOut = VERUS_CHAINNAME;
+        }
+        else
+        {
+            for (int i = 1; i < retNames.size(); i++)
+            {
+                if (ChainOut.size())
+                {
+                    ChainOut = ChainOut + ".";
+                }
+                ChainOut = ChainOut + retNames[i];
+            }
+        }
+    }
+
+    return retNames;
+}
+
+// takes a multipart name, either complete or partially processed with a Parent hash,
+// hash its parent names into a parent ID and return the parent hash and cleaned, single name
+std::string CleanName(const std::string &Name, uint160 &Parent, bool displayfilter)
+{
+    std::string chainName;
+    std::vector<std::string> subNames = ParseSubNames(Name, chainName);
+
+    if (!subNames.size())
+    {
+        return "";
+    }
+    for (int i = subNames.size() - 1; i > 0; i--)
+    {
+        std::string parentNameStr = boost::algorithm::to_lower_copy(subNames[i]);
+        const char *parentName = parentNameStr.c_str();
+        uint256 idHash;
+
+        if (Parent.IsNull())
+        {
+            idHash = Hash(parentName, parentName + parentNameStr.size());
+        }
+        else
+        {
+            idHash = Hash(parentName, parentName + strlen(parentName));
+            idHash = Hash(Parent.begin(), Parent.end(), idHash.begin(), idHash.end());
+        }
+        Parent = Hash160(idHash.begin(), idHash.end());
+        //printf("uint160 for parent %s: %s\n", parentName, Parent.GetHex().c_str());
+    }
+    return subNames[0];
+}
+
+CIdentityID CIdentity::GetID(const std::string &Name, uint160 &parent)
+{
+    std::string cleanName = CleanName(Name, parent);
+
+    std::string subName = boost::algorithm::to_lower_copy(cleanName);
+    const char *idName = subName.c_str();
+    //printf("hashing: %s, %s\n", idName, parent.GetHex().c_str());
+
+    uint256 idHash;
+    if (parent.IsNull())
+    {
+        idHash = Hash(idName, idName + strlen(idName));
+    }
+    else
+    {
+        idHash = Hash(idName, idName + strlen(idName));
+        idHash = Hash(parent.begin(), parent.end(), idHash.begin(), idHash.end());
+
+    }
+    return Hash160(idHash.begin(), idHash.end());
+}
+
+CIdentityID CIdentity::GetID(const std::string &Name) const
+{
+    uint160 parent;
+    std::string cleanName = CleanName(Name, parent);
+
+    std::string subName = boost::algorithm::to_lower_copy(cleanName);
+    const char *idName = subName.c_str();
+    //printf("hashing: %s, %s\n", idName, parent.GetHex().c_str());
+
+    uint256 idHash;
+    if (parent.IsNull())
+    {
+        idHash = Hash(idName, idName + strlen(idName));
+    }
+    else
+    {
+        idHash = Hash(idName, idName + strlen(idName));
+        idHash = Hash(parent.begin(), parent.end(), idHash.begin(), idHash.end());
+
+    }
+    return Hash160(idHash.begin(), idHash.end());
+}
+
+CIdentityID CIdentity::GetID() const
+{
+    return GetID(name);
+}
+
+uint160 CCrossChainRPCData::GetChainID(std::string name)
+{
+    uint160 parent;
+    return CIdentity::GetID(name,parent);
+}
 
 static const CRPCConvertParam vRPCConvertParams[] =
 {
@@ -99,15 +385,16 @@ static const CRPCConvertParam vRPCConvertParams[] =
     { "prioritisetransaction", 2 },
     { "setban", 2 },
     { "setban", 3 },
-    { "getblockhashes", 0 },
-    { "getblockhashes", 1 },
-    { "getblockhashes", 2 },
     { "getspentinfo", 0},
     { "getaddresstxids", 0},
     { "getaddressbalance", 0},
     { "getaddressdeltas", 0},
     { "getaddressutxos", 0},
     { "getaddressmempool", 0},
+    { "getblockhashes", 0},
+    { "getblockhashes", 1},
+    { "getblockhashes", 2},
+    { "getblockdeltas", 0},
     { "zcrawjoinsplit", 1 },
     { "zcrawjoinsplit", 2 },
     { "zcrawjoinsplit", 3 },
@@ -154,6 +441,15 @@ static const CRPCConvertParam vRPCConvertParams[] =
     { "getproofroot", 2},
     { "height_MoM", 1},
     { "calc_MoM", 2},
+    // pbaas
+    { "definechain", 0},
+    { "getdefinedchains", 0},
+    { "sendreserve", 0},
+    { "registeridentity", 0},
+    { "updateidentity", 0},
+    { "recoveridentity", 0},
+    // Zcash addition
+    { "z_setmigration", 0},
 };
 
 class CRPCConvertTable

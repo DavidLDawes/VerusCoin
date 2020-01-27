@@ -7,19 +7,18 @@ bool IsCryptoConditionsEnabled()
     return 0 != ASSETCHAINS_CC;
 }
 
-
-bool IsSupportedCryptoCondition(const CC *cond)
+bool IsSupportedCryptoCondition(const CC *cond, int evalCode)
 {
     int mask = cc_typeMask(cond);
 
     if (mask & ~CCEnabledTypes) return false;
 
-    // Also require that the condition have at least one signable node
-    if (!(mask & CCSigningNodes)) return false;
+    // Also require that the condition have at least one signable node or be a PBaaS compatible condition
+    // and at least have an eval node instead
+    if (!(mask & CCSigningNodes) && !(evalCode >= CCFirstEvalOnly && evalCode <= CCLastEvalOnly && mask & CCEvalNode)) return false;
 
     return true;
 }
-
 
 bool IsSignedCryptoCondition(const CC *cond)
 {
@@ -39,6 +38,13 @@ static unsigned char* CopyPubKey(CPubKey pkIn)
     return pk;
 }
 
+static unsigned char* CopyKeyIDChars(uint8_t *chars)
+{
+    unsigned char* pk = (unsigned char*) malloc(33);
+    memcpy(pk, chars, 20);  // only the keyID
+    memset(pk + 20, 0, 13);
+    return pk;
+}
 
 CC* CCNewThreshold(int t, std::vector<CC*> v)
 {
@@ -50,7 +56,6 @@ CC* CCNewThreshold(int t, std::vector<CC*> v)
     return cond;
 }
 
-
 CC* CCNewSecp256k1(CPubKey k)
 {
     CC *cond = cc_new(CC_Secp256k1);
@@ -58,6 +63,13 @@ CC* CCNewSecp256k1(CPubKey k)
     return cond;
 }
 
+CC* CCNewHashedSecp256k1(CKeyID keyID)
+{
+    CC *cond = cc_new(CC_Secp256k1);
+
+    cond->publicKey = CopyKeyIDChars(keyID.begin());
+    return cond;
+}
 
 CC* CCNewEval(std::vector<unsigned char> code)
 {
@@ -68,19 +80,22 @@ CC* CCNewEval(std::vector<unsigned char> code)
     return cond;
 }
 
+std::vector<unsigned char> CCPubKeyVec(const CC *cond)
+{
+    unsigned char buf[MAX_BINARY_CC_SIZE];
+    size_t len = cc_conditionBinary(cond, buf, MAX_BINARY_CC_SIZE);
+    return std::vector<unsigned char>(buf, buf+len);
+}
 
 CScript CCPubKey(const CC *cond)
 {
-    unsigned char buf[1000];
-    size_t len = cc_conditionBinary(cond, buf);
-    return CScript() << std::vector<unsigned char>(buf, buf+len) << OP_CHECKCRYPTOCONDITION;
+    return CScript() << CCPubKeyVec(cond) << OP_CHECKCRYPTOCONDITION;
 }
-
 
 CScript CCSig(const CC *cond)
 {
-    unsigned char buf[10000];
-    size_t len = cc_fulfillmentBinary(cond, buf, 10000);
+    unsigned char buf[MAX_BINARY_CC_SIZE];
+    size_t len = cc_fulfillmentBinary(cond, buf, MAX_BINARY_CC_SIZE);
     auto ffill = std::vector<unsigned char>(buf, buf+len);
     ffill.push_back(1);  // SIGHASH_ALL
     return CScript() << ffill;
@@ -88,8 +103,17 @@ CScript CCSig(const CC *cond)
 
 std::vector<unsigned char> CCSigVec(const CC *cond)
 {
-    unsigned char buf[10000];
-    size_t len = cc_fulfillmentBinary(cond, buf, 10000);
+    unsigned char buf[MAX_BINARY_CC_SIZE];
+    size_t len = cc_fulfillmentBinary(cond, buf, MAX_BINARY_CC_SIZE);
+    auto ffill = std::vector<unsigned char>(buf, buf+len);
+    ffill.push_back(1);  // SIGHASH_ALL
+    return ffill;
+}
+
+std::vector<unsigned char> CCPartialSigVec(const CC *cond)
+{
+    unsigned char buf[MAX_BINARY_CC_SIZE];
+    size_t len = cc_partialFulfillmentBinary(cond, buf, MAX_BINARY_CC_SIZE);
     auto ffill = std::vector<unsigned char>(buf, buf+len);
     ffill.push_back(1);  // SIGHASH_ALL
     return ffill;
