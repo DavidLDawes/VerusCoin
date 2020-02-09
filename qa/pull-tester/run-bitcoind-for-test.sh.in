@@ -3,6 +3,7 @@
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or https://www.opensource.org/licenses/mit-license.php .
 #
+# Adapted for verusd and verus
 ZCASH_LOAD_TIMEOUT=500
 DATADIR="@abs_top_builddir@/.zcash"
 rm -rf "$DATADIR"

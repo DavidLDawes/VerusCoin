@@ -2,7 +2,9 @@
 # Copyright (c) 2013-2014 The Bitcoin Core developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or https://www.opensource.org/licenses/mit-license.php .
-
+#
+# Modified to test verusd
+#
 BUILDDIR="@abs_top_builddir@"
 EXEEXT="@EXEEXT@"
 
@@ -13,6 +15,6 @@ EXEEXT="@EXEEXT@"
 @ENABLE_ZMQ_TRUE@ENABLE_ZMQ=1
 @ENABLE_PROTON_TRUE@ENABLE_PROTON=1
 
-REAL_BITCOIND="$BUILDDIR/src/komodod${EXEEXT}"
-REAL_BITCOINCLI="$BUILDDIR/src/komodo-cli${EXEEXT}"
+REAL_BITCOIND="$BUILDDIR/src/verusd${EXEEXT}"
+REAL_BITCOINCLI="$BUILDDIR/src/verus-cli${EXEEXT}"
 
